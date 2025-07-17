@@ -1,0 +1,7 @@
+{
+    "name": "@5dcontrol/proto",
+    "private": true,
+    "scripts": {
+        "proto": "rm -rf dist && flatc --go --go-namespace dist control.fbs && flatc --ts --ts-no-import-ext -o dist control.fbs"
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "name": "@5dcontrol/server",
+    "private": true,
+    "scripts": {
+        "dev": "air",
+        "build": "go build -o bin/server ./cmd",
+        "lint": "golangci-lint run",
+        "test": "go test ./..."
+    },
+    "dependencies": {
+        "@5dcontrol/proto": "*"
+    }
+}

@@ -1,0 +1,39 @@
+{
+    "$schema": "https://turborepo.org/schema.json",
+    "tasks": {
+        "proto": {
+            "outputs": [
+                "dist/**"
+            ],
+            "inputs": [
+                "control.fbs"
+            ]
+        },
+        "build": {
+            "dependsOn": [
+                "^build",
+                "^proto"
+            ],
+            "outputs": [
+                "dist/**",
+                "build/**",
+                "out/**"
+            ]
+        },
+        "dev": {
+            "cache": false,
+            "persistent": true
+        },
+        "lint": {
+            "outputs": []
+        },
+        "test": {
+            "outputs": [
+                "coverage/**"
+            ]
+        }
+    },
+    "globalDependencies": [
+        "go.work"
+    ]
+}

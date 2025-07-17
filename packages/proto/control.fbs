@@ -1,0 +1,13 @@
+namespace Control;
+
+enum ControlType:byte {
+  NONE = 0,
+  FOCUS = 1,
+  CAPTURE = 2
+}
+
+table Control {
+  type:ControlType;
+}
+
+root_type Control;
