@@ -4,6 +4,7 @@ package gphoto2
 #cgo pkg-config: libgphoto2
 #include <gphoto2/gphoto2.h>
 #include <string.h>
+#include <stdlib.h>
 
 CameraFile *new_camera_file() {
     CameraFile *file;
@@ -14,6 +15,7 @@ CameraFile *new_camera_file() {
 }
 */
 import "C"
+import "unsafe"
 
 type Camera C.Camera
 type CameraCaptureType int
@@ -44,6 +46,16 @@ func (camera *Camera) CapturePreview(file *CameraFile, ctx *Context) error {
 	return nil
 }
 
+func (camera *Camera) Capture(ctx *Context) error {
+	var path C.CameraFilePath
+
+	if r := C.gp_camera_capture(camera.c(), C.GP_CAPTURE_IMAGE, &path, ctx.c()); r < C.GP_OK {
+		return e(r)
+	}
+
+	return nil
+}
+
 func (camera *Camera) File() (*CameraFile, error) {
 	file := C.new_camera_file()
 	if file == nil {
@@ -68,4 +80,37 @@ func (camera *Camera) Close() error {
 
 func (camera *Camera) c() *C.Camera {
 	return (*C.Camera)(camera)
+}
+
+// SetConfigValueString sets a configuration value by key using a string value.
+func (camera *Camera) SetConfigValueString(key, value string, ctx *Context) error {
+	var config *C.CameraWidget
+	if r := C.gp_camera_get_config(camera.c(), &config, ctx.c()); r < C.GP_OK {
+		return e(r)
+	}
+
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	var child *C.CameraWidget
+	if r := C.gp_widget_get_child_by_name(config, ckey, &child); r < C.GP_OK {
+		C.gp_widget_free(config)
+		return e(r)
+	}
+
+	cvalue := C.CString(value)
+	defer C.free(unsafe.Pointer(cvalue))
+
+	if r := C.gp_widget_set_value(child, unsafe.Pointer(cvalue)); r < C.GP_OK {
+		C.gp_widget_free(config)
+		return e(r)
+	}
+
+	if r := C.gp_camera_set_config(camera.c(), config, ctx.c()); r < C.GP_OK {
+		C.gp_widget_free(config)
+		return e(r)
+	}
+
+	C.gp_widget_free(config)
+	return nil
 }

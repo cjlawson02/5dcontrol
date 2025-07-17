@@ -25,6 +25,7 @@ type CameraManager struct {
 	capturing      atomic.Bool
 	isConnected    atomic.Bool
 	disconnectedCh chan struct{}
+	pausePreview   chan bool
 }
 
 var (
@@ -39,6 +40,7 @@ func NewCameraManager() *CameraManager {
 	return &CameraManager{
 		disconnectedCh: make(chan struct{}),
 		isConnected:    atomic.Bool{},
+		pausePreview:   make(chan bool),
 	}
 }
 
@@ -63,6 +65,9 @@ func (manager *CameraManager) Connect() error {
 		ctx.Close()
 		return fmt.Errorf("failed to initialize camera: %w", err)
 	}
+
+	_ = camera.SetConfigValueString("capturetarget", "Memory card", ctx)
+	_ = camera.SetConfigValueString("reviewtime", "None", ctx)
 
 	manager.camera = camera
 	manager.ctx = ctx
@@ -104,6 +109,19 @@ func (manager *CameraManager) RemoveClient(id string) {
 	}
 }
 
+func (manager *CameraManager) CaptureImage() error {
+	if !manager.isConnected.Load() {
+		return fmt.Errorf("camera is not connected")
+	}
+
+	manager.pausePreview <- true // request pause
+
+	err := manager.camera.Capture(manager.ctx)
+
+	manager.pausePreview <- false
+	return err
+}
+
 func (manager *CameraManager) RunCaptureLoop() {
 	if !manager.isConnected.Load() {
 		return // Don't run capture loop if camera is not connected
@@ -122,6 +140,10 @@ func (manager *CameraManager) RunCaptureLoop() {
 		select {
 		case <-manager.captureQuit:
 			return
+		case pause := <-manager.pausePreview:
+			if pause {
+				<-manager.pausePreview // wait for resume
+			}
 		default:
 			if err := manager.camera.CapturePreview(file, manager.ctx); err != nil {
 				log.Printf("CapturePreview failed: %v", err)

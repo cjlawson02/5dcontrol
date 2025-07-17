@@ -41,6 +41,7 @@ func RunWebSocketServer(cam *camera.CameraManager, updates <-chan *camera.Camera
 			case Proto.ControlTypeCAPTURE:
 				// capture command
 				log.Println("Capture command received")
+				cam.CaptureImage()
 			}
 		}
 	})
