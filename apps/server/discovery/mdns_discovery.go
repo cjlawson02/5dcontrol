@@ -10,8 +10,8 @@ import (
 // blocks until the program exits (or server.Shutdown is called).
 func RunMDNSDiscovery() {
 	_, err := zeroconf.Register(
-		"CanonPTPServer",        // service instance name
-		"_canonptp._tcp",        // service type
+		"5DControl",             // service instance name
+		"_5dcontrol._tcp",       // service type
 		"local.",                // domain
 		8080,                    // port
 		[]string{"version=1.0"}, // TXT records
@@ -20,7 +20,7 @@ func RunMDNSDiscovery() {
 	if err != nil {
 		log.Fatalf("mDNS register failed: %v", err)
 	}
-	log.Println("mDNS discovery running: _canonptp._tcp on port 8080")
+	log.Println("mDNS discovery running: _5dcontrol._tcp on port 8080")
 
 	// Block here until process exit; if you need to stop:
 	select {}
