@@ -3,11 +3,29 @@ namespace Control;
 enum ControlType:byte {
   NONE = 0,
   FOCUS = 1,
-  CAPTURE = 2
+  CAPTURE = 2,
+  QUERY_STATUS = 3  // New command
 }
 
-table Control {
+enum MessageType:byte {
+  UNKNOWN = 0,
+  COMMAND = 1,
+  STATUS = 2
+}
+
+table Command {
   type:ControlType;
 }
 
-root_type Control;
+table Status {
+  camera_connected:bool;
+  battery_level:uint8;
+}
+
+table Message {
+  message_type:MessageType;
+  command:Command;
+  status:Status;
+}
+
+root_type Message;

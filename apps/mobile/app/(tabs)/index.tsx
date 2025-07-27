@@ -4,9 +4,11 @@ import { FocusIndicator } from "@/components/FocusIndicator";
 import { TopStatusBar } from "@/components/TopStatusBar";
 import { useWebSocketContext } from "@/components/WebSocketContext";
 import { ControlType } from "@proto/control";
+import { LinearProgress, Text } from "@rneui/themed";
 import * as Haptics from "expo-haptics";
 import { useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export default function HomeScreen() {
     null
   );
   const frameTimes = useRef<number[]>([]);
-  const { ip, sendCommand } = useWebSocketContext();
+  const { cameraStatus, ip, sendCommand } = useWebSocketContext();
 
   const handleFocusTap = (event: any) => {
     const { locationX, locationY } = event.nativeEvent;
@@ -37,13 +39,48 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Pressable style={styles.touchOverlay} onPress={handleFocusTap}>
-        <CameraStream
-          url={`http://${ip}:8080/live.mjpeg`}
-          onFrame={handleFrame}
-        />
-        {focusBox && <FocusIndicator x={focusBox.x} y={focusBox.y} />}
-        <CaptureButton onPress={() => sendCommand(ControlType.CAPTURE)} />
-        <TopStatusBar fps={fps} />
+        {cameraStatus !== "connected" ? (
+          <SafeAreaView
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: "black",
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 200,
+            }}
+          >
+            <Text
+              style={{
+                color: "white",
+                fontSize: 30,
+                marginBottom: 5,
+              }}
+            >
+              Camera Disconnected
+            </Text>
+            <Text
+              style={{
+                color: "white",
+                fontSize: 18,
+                marginBottom: 20,
+              }}
+            >
+              Please ensure the camera is powered on and connected to the
+              5DControl.
+            </Text>
+            <LinearProgress />
+          </SafeAreaView>
+        ) : (
+          <>
+            <CameraStream
+              url={`http://${ip}:8080/live.mjpeg`}
+              onFrame={handleFrame}
+            />
+            {focusBox && <FocusIndicator x={focusBox.x} y={focusBox.y} />}
+            <CaptureButton onPress={() => sendCommand(ControlType.CAPTURE)} />
+            <TopStatusBar fps={fps} />
+          </>
+        )}
       </Pressable>
     </View>
   );

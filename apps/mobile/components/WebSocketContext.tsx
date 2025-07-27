@@ -1,6 +1,6 @@
-import { Control, ControlType } from "@proto/control";
+import { Command, ControlType, Message, MessageType } from "@proto/control";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Builder } from "flatbuffers";
+import { Builder, ByteBuffer } from "flatbuffers";
 import React, {
   createContext,
   ReactNode,
@@ -14,6 +14,7 @@ type ConnectionStatus = "connected" | "disconnected" | "loading";
 
 interface WebSocketContextValue {
   status: ConnectionStatus;
+  cameraStatus: ConnectionStatus;
   ip: string | null;
   setIp: (ip: string | null) => void;
   sendCommand: (type: ControlType) => void;
@@ -23,12 +24,21 @@ const WebSocketContext = createContext<WebSocketContextValue | undefined>(
   undefined
 );
 
-const buildMessage = (type: ControlType): Uint8Array => {
-  const builder = new Builder(32);
-  Control.startControl(builder);
-  Control.addType(builder, type);
-  const control = Control.endControl(builder);
-  builder.finish(control);
+const buildCommandMessage = (type: ControlType): Uint8Array => {
+  const builder = new Builder(64);
+
+  // Build Command table
+  Command.startCommand(builder);
+  Command.addType(builder, type);
+  const commandOffset = Command.endCommand(builder);
+
+  // Build Message table
+  Message.startMessage(builder);
+  Message.addMessageType(builder, MessageType.COMMAND);
+  Message.addCommand(builder, commandOffset);
+  const messageOffset = Message.endMessage(builder);
+
+  builder.finish(messageOffset);
   return builder.asUint8Array();
 };
 
@@ -37,6 +47,7 @@ const DEFAULT_IP = "192.168.1.1";
 
 export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const [status, setStatus] = useState<ConnectionStatus>("loading");
+  const [cameraStatus, setCameraStatus] = useState<ConnectionStatus>("loading");
   const [ip, setInternalIp] = useState<string | null>(null);
 
   const setConnected = useCallback(() => setStatus("connected"), []);
@@ -69,7 +80,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setIp(DEFAULT_IP);
         }
-      } catch (e) {
+      } catch {
         // Handle error silently
       } finally {
         setDisconnected();
@@ -79,31 +90,54 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    wsRef.current = new WebSocket(`http://${ip}:8888/ws`);
+    if (!ip) return;
 
-    wsRef.current.onopen = () => {
+    const ws = new WebSocket(`http://${ip}:8888/ws`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
       console.log("WebSocket connected");
       setConnected();
+
+      // Request camera status
+      const msg = buildCommandMessage(ControlType.QUERY_STATUS);
+      ws.send(msg);
     };
 
-    wsRef.current.onclose = (e) => {
-      console.log(
-        `WebSocket closed. Code: ${e.code}, Reason: ${e.reason}, WasClean: ${e.wasClean}`
-      );
+    ws.onclose = (e) => {
+      console.log(`WebSocket closed:`, e);
       setDisconnected();
+      setCameraStatus("disconnected");
     };
 
-    return () => wsRef.current?.close();
-  }, [ip]);
+    ws.onmessage = (e) => {
+      const data = new Uint8Array(e.data);
+      const msg = Message.getRootAsMessage(new ByteBuffer(data));
+
+      if (msg.messageType() === MessageType.STATUS) {
+        const status = msg.status();
+        if (status) {
+          const connected = status.cameraConnected();
+          console.log("Camera connected:", connected);
+          setCameraStatus(connected ? "connected" : "disconnected");
+        }
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [ip, setConnected, setDisconnected]);
 
   const sendCommand = useCallback((type: ControlType) => {
     console.log(`Sending command: ${ControlType[type]}`);
-    const msg = buildMessage(type);
+    const msg = buildCommandMessage(type);
     wsRef.current?.send(msg);
   }, []);
 
   const value: WebSocketContextValue = {
     status,
+    cameraStatus,
     ip,
     setIp,
     sendCommand,
