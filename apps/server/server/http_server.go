@@ -9,8 +9,16 @@ import (
 	"github.com/cjlawson02/5dcontrol/server/camera"
 )
 
+// CameraLike defines the interface that both CameraManager and MockCameraManager implement
+type CameraLike interface {
+	IsConnected() bool
+	AddClient(id string)
+	RemoveClient(id string)
+	GetLatestFrame() *camera.Frame
+}
+
 // RunHTTPServer starts the HTTP endpoints for MJPEG streaming and snapshots.
-func RunHTTPServer(cam *camera.CameraManager, updates <-chan *camera.CameraManager) {
+func RunHTTPServer(cam CameraLike, updates <-chan *camera.CameraManager) {
 	if updates != nil {
 		go func() {
 			for c := range updates {
@@ -34,7 +42,7 @@ func RunHTTPServer(cam *camera.CameraManager, updates <-chan *camera.CameraManag
 
 		var lastFrame *camera.Frame
 		for cam.IsConnected() {
-			frame := cam.LatestFrame.Load()
+			frame := cam.GetLatestFrame()
 			if frame == nil || frame == lastFrame {
 				time.Sleep(1 * time.Millisecond)
 				continue
@@ -68,7 +76,7 @@ func RunHTTPServer(cam *camera.CameraManager, updates <-chan *camera.CameraManag
 			return
 		}
 
-		frame := cam.LatestFrame.Load()
+		frame := cam.GetLatestFrame()
 		if frame == nil {
 			http.Error(w, "No frame available", http.StatusServiceUnavailable)
 			return

@@ -1,8 +1,22 @@
-# Welcome to your Expo app 👋
+# 5DControl - Professional Camera Remote Control 📷
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A powerful camera control system for Canon DSLRs using React Native (Expo) and Go, with real-time MJPEG streaming over WiFi.
 
-## Get started
+## 🚀 Quick Start
+
+### Demo Mode (No Camera Required!)
+
+Test all features without a physical camera. From the project root, run:
+
+```bash
+npm run dev:demo
+```
+
+This starts both the server (with mock camera) and mobile app using Turbo.
+
+See [DEMO_MODE.md](DEMO_MODE.md) for more options and full details.
+
+### Production Mode
 
 1. Install dependencies
 
@@ -10,10 +24,18 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Start the server (with real camera)
 
    ```bash
-   npx expo start
+   cd apps/server
+   npm run dev
+   ```
+
+3. Start the mobile app
+
+   ```bash
+   cd apps/mobile
+   npm run dev
    ```
 
 In the output, you'll find options to open the app in a

@@ -3,6 +3,7 @@
     "private": true,
     "scripts": {
         "dev": "air",
+        "dev:demo": "go run . -demo",
         "build": "go build -o bin/server .",
         "lint": "golangci-lint run",
         "test": "go test ./..."

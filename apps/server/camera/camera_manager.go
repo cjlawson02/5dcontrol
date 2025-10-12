@@ -202,6 +202,10 @@ func (manager *CameraManager) IsConnected() bool {
 	return manager.isConnected.Load()
 }
 
+func (manager *CameraManager) GetLatestFrame() *Frame {
+	return manager.LatestFrame.Load()
+}
+
 func (manager *CameraManager) handleDisconnect() {
 	// Only handle disconnect once
 	if !manager.isConnected.Swap(false) {
