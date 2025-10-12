@@ -92,7 +92,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!ip) return;
 
-    const ws = new WebSocket(`http://${ip}:8888/ws`);
+    const ws = new WebSocket(`ws://${ip}:8888/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {

@@ -39,6 +39,15 @@ func sendStatus(conn *websocket.Conn, cam *camera.CameraManager) {
 
 // RunWebSocketServer starts the WebSocket handler for camera control.
 func RunWebSocketServer(cam *camera.CameraManager, updates <-chan *camera.CameraManager) {
+	// Listen for camera updates
+	if updates != nil {
+		go func() {
+			for c := range updates {
+				cam = c
+			}
+		}()
+	}
+
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {

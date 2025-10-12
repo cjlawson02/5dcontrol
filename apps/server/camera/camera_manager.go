@@ -40,7 +40,7 @@ func NewCameraManager() *CameraManager {
 	return &CameraManager{
 		disconnectedCh: make(chan struct{}),
 		isConnected:    atomic.Bool{},
-		pausePreview:   make(chan bool),
+		pausePreview:   make(chan bool, 1),
 	}
 }
 
@@ -203,7 +203,11 @@ func (manager *CameraManager) IsConnected() bool {
 }
 
 func (manager *CameraManager) handleDisconnect() {
-	manager.isConnected.Store(false)
+	// Only handle disconnect once
+	if !manager.isConnected.Swap(false) {
+		return // Already disconnected
+	}
+
 	if manager.camera != nil {
 		manager.camera.Close()
 		manager.ctx.Close()

@@ -20,6 +20,11 @@ export default function HomeScreen() {
   const { cameraStatus, ip, sendCommand } = useWebSocketContext();
 
   const handleFocusTap = (event: any) => {
+    // Don't allow focus if camera is not connected
+    if (cameraStatus !== "connected") {
+      return;
+    }
+
     const { locationX, locationY } = event.nativeEvent;
     setFocusBox({ x: locationX, y: locationY });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -35,7 +35,6 @@ func main() {
 			}
 			log.Println("Camera connected!")
 
-			go cam.RunCaptureLoop()
 			camCh <- cam // notify servers of connected camera
 
 			// wait for disconnection
