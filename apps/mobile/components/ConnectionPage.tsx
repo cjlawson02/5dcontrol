@@ -2,30 +2,45 @@ import { Button, Card, Input } from "@rneui/themed";
 import React, { useEffect, useState } from "react";
 import {
   Keyboard,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useWebSocketContext } from "./WebSocketContext";
 
 const ConnectionPage: React.FC = () => {
-  const { status, ip, setIp } = useWebSocketContext();
+  const { status, ip, setIp, reconnect } = useWebSocketContext();
   const [ipField, setIpField] = useState<string>(ip ?? "");
+
+  console.log(
+    `[ConnectionPage] Render - status: ${status}, ip: ${ip}, ipField: ${ipField}`
+  );
 
   useEffect(() => {
     if (ip) {
+      console.log(`[ConnectionPage] IP changed, updating field to: ${ip}`);
       setIpField(ip);
     }
   }, [ip]);
 
-  const handleIpChange = async (text: string) => {
+  const handleIpChange = (text: string) => {
     setIpField(text);
   };
 
   const handleSubmit = async () => {
-    setIp(ipField.trim());
+    console.log(
+      `[ConnectionPage] Connect button clicked with IP: ${ipField.trim()}`
+    );
+    const newIp = ipField.trim();
+    if (newIp !== ip) {
+      console.log(`[ConnectionPage] IP changed, calling setIp`);
+      setIp(newIp);
+    } else {
+      console.log(`[ConnectionPage] Same IP, calling reconnect`);
+      reconnect();
+    }
   };
 
   return (
