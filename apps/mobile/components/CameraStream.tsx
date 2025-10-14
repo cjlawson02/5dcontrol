@@ -4,21 +4,13 @@ import WebView from "react-native-webview";
 interface Props {
   url: string;
   onFrame: () => void;
-  onTap?: (x: number, y: number) => void;
 }
 
-export function CameraStream({ url, onFrame, onTap }: Props) {
+export function CameraStream({ url, onFrame }: Props) {
   const handleMessage = (event: any) => {
     const data = event.nativeEvent.data;
     if (data === "frame") {
       onFrame();
-    } else if (data.startsWith("tap:")) {
-      const coords = data.substring(4).split(",");
-      const x = parseFloat(coords[0]);
-      const y = parseFloat(coords[1]);
-      if (onTap) {
-        onTap(x, y);
-      }
     }
   };
 
@@ -81,9 +73,6 @@ export function CameraStream({ url, onFrame, onTap }: Props) {
             let lastDistance = 0;
             let lastCenter = { x: 0, y: 0 };
             let isPinching = false;
-            let touchStartPos = { x: 0, y: 0 };
-            let touchStartTime = 0;
-            let hasMoved = false;
 
             function getDistance(touches) {
                 const dx = touches[0].clientX - touches[1].clientX;
@@ -111,39 +100,22 @@ export function CameraStream({ url, onFrame, onTap }: Props) {
             }
 
             container.addEventListener('touchstart', function(e) {
-                hasMoved = false;
-                touchStartTime = Date.now();
-
                 if (e.touches.length === 2) {
                     e.preventDefault();
                     isPinching = true;
                     lastDistance = getDistance(e.touches);
                     lastCenter = getCenter(e.touches);
                 } else if (e.touches.length === 1) {
-                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-
                     if (scale > 1) {
                         e.preventDefault();
                     }
-
                     lastCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 }
             }, { passive: false });
 
             container.addEventListener('touchmove', function(e) {
-                const moveThreshold = 10; // pixels
-
-                if (e.touches.length === 1) {
-                    const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
-                    const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
-                    if (dx > moveThreshold || dy > moveThreshold) {
-                        hasMoved = true;
-                    }
-                }
-
                 if (e.touches.length === 2 && isPinching) {
                     e.preventDefault();
-                    hasMoved = true;
 
                     // Calculate zoom
                     const distance = getDistance(e.touches);
@@ -193,17 +165,6 @@ export function CameraStream({ url, onFrame, onTap }: Props) {
                     translateX = 0;
                     translateY = 0;
                     updateTransform();
-                }
-
-                // If it was a quick tap without movement and at 1.0x scale, send tap event
-                if (e.touches.length === 0 && !hasMoved && scale === 1.0) {
-                    const touchDuration = Date.now() - touchStartTime;
-                    if (touchDuration < 300) { // Less than 300ms = tap
-                        const rect = container.getBoundingClientRect();
-                        const x = touchStartPos.x - rect.left;
-                        const y = touchStartPos.y - rect.top;
-                        window.ReactNativeWebView.postMessage('tap:' + x + ',' + y);
-                    }
                 }
             }, { passive: false });
             </script>

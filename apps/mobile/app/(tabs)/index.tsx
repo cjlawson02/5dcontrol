@@ -1,38 +1,36 @@
 import { CameraStream } from "@/components/CameraStream";
 import { CaptureButton } from "@/components/CaptureButton";
-import { FocusIndicator } from "@/components/FocusIndicator";
-import { GridOverlay, GridType } from "@/components/GridOverlay";
+import { GridOverlay } from "@/components/GridOverlay";
 import { TopStatusBar } from "@/components/TopStatusBar";
 import { useWebSocketContext } from "@/components/WebSocketContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { ControlType } from "@proto/control";
 import { Icon, LinearProgress, Text } from "@rneui/themed";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-  const [loading, setLoading] = useState(true);
   const [fps, setFps] = useState(0);
-  const [focusBox, setFocusBox] = useState<{ x: number; y: number } | null>(
-    null
-  );
-  const [gridType, setGridType] = useState<GridType>("none");
+  const [focusActive, setFocusActive] = useState(false);
   const [captureFlash, setCaptureFlash] = useState(false);
   const frameTimes = useRef<number[]>([]);
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const { cameraStatus, ip, sendCommand } = useWebSocketContext();
+  const { state: settings } = useSettings();
 
-  const handleFocusTap = (x: number, y: number) => {
+  const handleFocus = () => {
     // Don't allow focus if camera is not connected
     if (cameraStatus !== "connected") {
       return;
     }
 
-    setFocusBox({ x, y });
+    setFocusActive(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendCommand(ControlType.FOCUS);
-    setTimeout(() => setFocusBox(null), 800);
+    setTimeout(() => setFocusActive(false), 800);
   };
 
   const handleCapture = () => {
@@ -62,18 +60,9 @@ export default function HomeScreen() {
     });
   };
 
-  const cycleGrid = () => {
-    const grids: GridType[] = [
-      "none",
-      "rule-of-thirds",
-      "golden-ratio",
-      "center-cross",
-      "diagonal",
-    ];
-    const currentIndex = grids.indexOf(gridType);
-    const nextIndex = (currentIndex + 1) % grids.length;
-    setGridType(grids[nextIndex]);
+  const openSettings = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/settings");
   };
 
   const handleFrame = () => {
@@ -82,7 +71,6 @@ export default function HomeScreen() {
     frameTimes.current.push(now);
     frameTimes.current = frameTimes.current.filter((t) => now - t <= 1000);
     setFps(frameTimes.current.length);
-    if (loading) setLoading(false);
   };
 
   return (
@@ -123,30 +111,37 @@ export default function HomeScreen() {
           <CameraStream
             url={`http://${ip}:8080/live.mjpeg`}
             onFrame={handleFrame}
-            onTap={handleFocusTap}
           />
-          <GridOverlay type={gridType} visible={true} />
-          {focusBox && <FocusIndicator x={focusBox.x} y={focusBox.y} />}
+          <GridOverlay type={settings.gridType} visible={true} />
+          {focusActive && (
+            <View style={styles.focusIndicator}>
+              <View style={styles.focusBox} />
+            </View>
+          )}
           {captureFlash && (
             <Animated.View
               style={[styles.captureFlash, { opacity: flashOpacity }]}
             />
           )}
           <CaptureButton onPress={handleCapture} />
-          <TopStatusBar fps={fps} />
 
-          {/* Grid toggle button */}
+          {/* Focus button */}
           <TouchableOpacity
-            style={styles.gridButton}
-            onPress={cycleGrid}
+            style={styles.focusButton}
+            onPress={handleFocus}
             activeOpacity={0.7}
           >
-            <Icon
-              name="grid"
-              type="feather"
-              color={gridType === "none" ? "#888" : "#00ffcc"}
-              size={24}
-            />
+            <Icon name="focus-2" type="feather" color="#fff" size={24} />
+          </TouchableOpacity>
+          <TopStatusBar fps={fps} />
+
+          {/* Settings button */}
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={openSettings}
+            activeOpacity={0.7}
+          >
+            <Icon name="settings" type="feather" color="#fff" size={24} />
           </TouchableOpacity>
         </>
       )}
@@ -165,7 +160,33 @@ const styles = StyleSheet.create({
     zIndex: 100,
     pointerEvents: "none",
   },
-  gridButton: {
+  focusIndicator: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 50,
+    pointerEvents: "none",
+  },
+  focusBox: {
+    width: 50,
+    height: 50,
+    borderWidth: 2,
+    borderColor: "#00ffff",
+    backgroundColor: "transparent",
+  },
+  focusButton: {
+    position: "absolute",
+    bottom: 120,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  settingsButton: {
     position: "absolute",
     top: 60,
     right: 20,

@@ -17,8 +17,8 @@ var upgrader = websocket.Upgrader{
 func sendStatus(conn *websocket.Conn, cam *camera.CameraManager) {
 	builder := flatbuffers.NewBuilder(0)
 
-	// Example values
-	batteryLevel := uint8(82)
+	// Get real battery level from camera
+	batteryLevel := cam.GetBatteryLevel()
 
 	Proto.StatusStart(builder)
 	Proto.StatusAddCameraConnected(builder, cam.IsConnected())
@@ -76,7 +76,9 @@ func RunWebSocketServer(cam *camera.CameraManager, updates <-chan *camera.Camera
 					switch cmd.Type() {
 					case Proto.ControlTypeFOCUS:
 						log.Println("Focus command received")
-						// Handle focus
+						if err := cam.TriggerFocus(); err != nil {
+							log.Printf("Failed to trigger focus: %v", err)
+						}
 					case Proto.ControlTypeCAPTURE:
 						log.Println("Capture command received")
 						cam.CaptureImage()

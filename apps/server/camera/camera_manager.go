@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	_ "net/http/pprof"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +27,8 @@ type CameraManager struct {
 	isConnected    atomic.Bool
 	disconnectedCh chan struct{}
 	pausePreview   chan bool
+	batteryLevel   atomic.Uint32
+	batteryQuit    chan struct{}
 }
 
 var (
@@ -74,6 +77,14 @@ func (manager *CameraManager) Connect() error {
 	manager.captureQuit = make(chan struct{})
 	manager.disconnectedCh = make(chan struct{}) // Create new channel for new connection
 	manager.isConnected.Store(true)
+
+	// Initialize battery level
+	manager.updateBatteryLevel()
+
+	// Start periodic battery level updates
+	manager.batteryQuit = make(chan struct{})
+	go manager.runBatteryUpdateLoop()
+
 	return nil
 }
 
@@ -120,6 +131,42 @@ func (manager *CameraManager) CaptureImage() error {
 
 	manager.pausePreview <- false
 	return err
+}
+
+// TriggerFocus attempts to trigger autofocus on the camera
+// Note: This may not work reliably with Canon 5D Mark III due to GPhoto2 limitations
+func (manager *CameraManager) TriggerFocus() error {
+	if !manager.isConnected.Load() {
+		return fmt.Errorf("camera is not connected")
+	}
+
+	// Try to trigger autofocus by setting focus mode to auto and back
+	// This is a workaround since GPhoto2 doesn't have direct autofocus trigger
+	originalMode, err := manager.camera.GetConfigValueString("afmode", manager.ctx)
+	if err != nil {
+		log.Printf("Could not get current AF mode: %v", err)
+		// Continue anyway, as this might not be critical
+	}
+
+	// Try to set AF mode to trigger autofocus
+	// Different cameras may use different config keys
+	afKeys := []string{"afmode", "autofocus", "focusmode", "focus"}
+	afValues := []string{"Auto", "On", "AF", "Single"}
+
+	for i, key := range afKeys {
+		if err := manager.camera.SetConfigValueString(key, afValues[i], manager.ctx); err == nil {
+			log.Printf("Successfully set %s to %s", key, afValues[i])
+			break
+		}
+	}
+
+	// Restore original mode if we changed it
+	if originalMode != "" {
+		time.Sleep(100 * time.Millisecond) // Brief delay
+		manager.camera.SetConfigValueString("afmode", originalMode, manager.ctx)
+	}
+
+	return nil
 }
 
 func (manager *CameraManager) RunCaptureLoop() {
@@ -212,6 +259,12 @@ func (manager *CameraManager) handleDisconnect() {
 		return // Already disconnected
 	}
 
+	// Stop battery update loop
+	if manager.batteryQuit != nil {
+		close(manager.batteryQuit)
+		manager.batteryQuit = nil
+	}
+
 	if manager.camera != nil {
 		manager.camera.Close()
 		manager.ctx.Close()
@@ -233,5 +286,91 @@ func (manager *CameraManager) Close() {
 		}
 		manager.handleDisconnect()
 		time.Sleep(1 * time.Second) // allow USB flush
+	}
+}
+
+// GetBatteryLevel returns the current battery level as a percentage (0-100)
+func (manager *CameraManager) GetBatteryLevel() uint8 {
+	return uint8(manager.batteryLevel.Load())
+}
+
+// updateBatteryLevel reads the battery level from the camera and updates the stored value
+func (manager *CameraManager) updateBatteryLevel() {
+	if !manager.isConnected.Load() || manager.camera == nil || manager.ctx == nil {
+		manager.batteryLevel.Store(0)
+		return
+	}
+
+	// Try different battery level configuration keys that might be used by Canon 5D Mark III
+	batteryKeys := []string{
+		"/main/status/batterylevel",
+		"/main/status/battery",
+		"/main/status/batteryvoltage",
+		"batterylevel",
+		"battery",
+		"batteryvoltage",
+	}
+
+	var batteryLevel uint32 = 0
+
+	for _, key := range batteryKeys {
+		value, err := manager.camera.GetConfigValueString(key, manager.ctx)
+		if err != nil {
+			log.Printf("Failed to read battery level with key '%s': %v", key, err)
+			continue
+		}
+
+		// Try to parse as integer
+		if level, parseErr := strconv.ParseUint(value, 10, 32); parseErr == nil {
+			batteryLevel = uint32(level)
+			log.Printf("Successfully read battery level: %d%% using key '%s'", batteryLevel, key)
+			break
+		}
+
+		// Try to parse as float and convert to percentage
+		if level, parseErr := strconv.ParseFloat(value, 64); parseErr == nil {
+			// Some cameras return voltage or normalized values
+			if level <= 1.0 {
+				// Normalized value (0.0-1.0)
+				batteryLevel = uint32(level * 100)
+			} else if level <= 10.0 {
+				// Voltage value (assume 7.2V is 100%)
+				batteryLevel = uint32((level / 7.2) * 100)
+			} else {
+				// Direct percentage
+				batteryLevel = uint32(level)
+			}
+			log.Printf("Successfully read battery level: %d%% using key '%s' (parsed from %s)", batteryLevel, key, value)
+			break
+		}
+
+		log.Printf("Could not parse battery level value '%s' from key '%s'", value, key)
+	}
+
+	// Clamp battery level to 0-100 range
+	if batteryLevel > 100 {
+		batteryLevel = 100
+	}
+
+	manager.batteryLevel.Store(batteryLevel)
+
+	// If we couldn't read any battery level, set to 0
+	if batteryLevel == 0 {
+		log.Printf("Failed to read battery level from camera")
+	}
+}
+
+// runBatteryUpdateLoop periodically updates the battery level
+func (manager *CameraManager) runBatteryUpdateLoop() {
+	ticker := time.NewTicker(30 * time.Second) // Update every 30 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-manager.batteryQuit:
+			return
+		case <-ticker.C:
+			manager.updateBatteryLevel()
+		}
 	}
 }
