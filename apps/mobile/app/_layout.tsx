@@ -7,6 +7,7 @@ import {
   WebSocketProvider,
   useWebSocketContext,
 } from "../components/WebSocketContext";
+import { SettingsProvider } from "../contexts/SettingsContext";
 
 function LayoutContent() {
   const { status } = useWebSocketContext();
@@ -27,9 +28,11 @@ export default function RootLayout() {
 
   return (
     <WebSocketProvider>
-      <ThemeProvider>
-        <LayoutContent />
-      </ThemeProvider>
+      <SettingsProvider>
+        <ThemeProvider>
+          <LayoutContent />
+        </ThemeProvider>
+      </SettingsProvider>
     </WebSocketProvider>
   );
 }
