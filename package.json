@@ -11,7 +11,10 @@
     "dev:demo": "turbo run dev:demo",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:unit": "turbo run test:unit",
+    "test:all": "turbo run test:all"
   },
   "devDependencies": {
     "turbo": "^2.5.8"

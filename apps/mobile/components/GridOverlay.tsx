@@ -12,7 +12,7 @@ export function GridOverlay({ type, visible }: GridOverlayProps) {
   }
 
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View testID="grid-overlay" style={styles.container} pointerEvents="none">
       {type === "rule-of-thirds" && <RuleOfThirds />}
       {type === "golden-ratio" && <GoldenRatio />}
     </View>

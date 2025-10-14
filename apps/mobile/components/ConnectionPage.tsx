@@ -44,7 +44,11 @@ const ConnectionPage: React.FC = () => {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <TouchableWithoutFeedback
+      onPress={Keyboard.dismiss}
+      accessible={false}
+      testID="connection-container"
+    >
       <SafeAreaView style={styles.container}>
         <Text style={styles.logo}>5DControl</Text>
         <View style={styles.content}>

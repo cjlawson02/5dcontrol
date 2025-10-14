@@ -1,7 +1,12 @@
 import { StyleSheet, View } from "react-native";
 
 export function FocusIndicator({ x, y }: { x: number; y: number }) {
-  return <View style={[styles.focusBox, { left: x - 25, top: y - 25 }]} />;
+  return (
+    <View
+      testID="focus-indicator"
+      style={[styles.focusBox, { left: x - 25, top: y - 25 }]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

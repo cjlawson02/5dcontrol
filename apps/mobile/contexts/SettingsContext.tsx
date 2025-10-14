@@ -20,6 +20,8 @@ type SettingsAction =
 interface SettingsContextType {
   state: SettingsState;
   setGridType: (gridType: GridType) => void;
+  dispatch?: (action: SettingsAction) => void;
+  loadSettings?: () => Promise<void>;
 }
 
 const initialState: SettingsState = {
@@ -62,10 +64,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   const [state, dispatch] = useReducer(settingsReducer, initialState);
 
   const setGridType = async (gridType: GridType) => {
-    try {
-      // Update local state immediately for instant UI feedback
-      dispatch({ type: "SET_GRID_TYPE", payload: gridType });
+    // Update local state immediately for instant UI feedback
+    dispatch({ type: "SET_GRID_TYPE", payload: gridType });
 
+    try {
       // Persist to storage
       await AsyncStorage.setItem("gridType", gridType);
     } catch (error) {
@@ -89,12 +91,17 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
 
   // Load settings on mount
   useEffect(() => {
-    loadSettings();
+    // Skip loading settings in test environment to allow mocking
+    if (process.env.NODE_ENV !== "test") {
+      loadSettings();
+    }
   }, []);
 
   const value: SettingsContextType = {
     state,
     setGridType,
+    dispatch,
+    loadSettings,
   };
 
   return (

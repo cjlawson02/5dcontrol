@@ -36,6 +36,21 @@
             "outputs": [
                 "coverage/**"
             ]
+        },
+        "test:integration": {
+            "outputs": [
+                "coverage/**"
+            ]
+        },
+        "test:unit": {
+            "outputs": [
+                "coverage/**"
+            ]
+        },
+        "test:all": {
+            "outputs": [
+                "coverage/**"
+            ]
         }
     },
     "globalDependencies": [

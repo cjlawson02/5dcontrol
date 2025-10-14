@@ -3,13 +3,13 @@ import WebView from "react-native-webview";
 
 interface Props {
   url: string;
-  onFrame: () => void;
+  onFrame?: () => void;
 }
 
 export function CameraStream({ url, onFrame }: Props) {
   const handleMessage = (event: any) => {
     const data = event.nativeEvent.data;
-    if (data === "frame") {
+    if (data === "frame" && onFrame) {
       onFrame();
     }
   };
