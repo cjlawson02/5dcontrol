@@ -15,7 +15,10 @@ CameraFile *new_camera_file() {
 }
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type Camera C.Camera
 type CameraCaptureType int
@@ -113,4 +116,29 @@ func (camera *Camera) SetConfigValueString(key, value string, ctx *Context) erro
 
 	C.gp_widget_free(config)
 	return nil
+}
+
+// GetConfigValueString gets a configuration value by key and returns it as a string.
+func (camera *Camera) GetConfigValueString(key string, ctx *Context) (string, error) {
+	var config *C.CameraWidget
+	if r := C.gp_camera_get_config(camera.c(), &config, ctx.c()); r < C.GP_OK {
+		return "", e(r)
+	}
+	defer C.gp_widget_free(config)
+
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	var child *C.CameraWidget
+	if r := C.gp_widget_get_child_by_name(config, ckey, &child); r < C.GP_OK {
+		return "", e(r)
+	}
+
+	// Try to get as string first
+	var value *C.char
+	if r := C.gp_widget_get_value(child, unsafe.Pointer(&value)); r == C.GP_OK {
+		return C.GoString(value), nil
+	}
+
+	return "", fmt.Errorf("unable to get widget value")
 }
