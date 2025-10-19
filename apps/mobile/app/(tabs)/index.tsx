@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { logger } from "@/utils/logger";
 
 export default function HomeScreen() {
   const [fps, setFps] = useState(0);
@@ -66,7 +67,7 @@ export default function HomeScreen() {
   };
 
   const handleFrame = () => {
-    console.log("Frame received");
+    logger.debug("Frame received");
     const now = Date.now();
     frameTimes.current.push(now);
     frameTimes.current = frameTimes.current.filter((t) => now - t <= 1000);

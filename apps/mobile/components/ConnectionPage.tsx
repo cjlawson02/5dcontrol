@@ -2,25 +2,26 @@ import { Button, Card, Input } from "@rneui/themed";
 import React, { useEffect, useState } from "react";
 import {
   Keyboard,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { logger } from "../utils/logger";
 import { useWebSocketContext } from "./WebSocketContext";
 
 const ConnectionPage: React.FC = () => {
   const { status, ip, setIp, reconnect } = useWebSocketContext();
   const [ipField, setIpField] = useState<string>(ip ?? "");
 
-  console.log(
-    `[ConnectionPage] Render - status: ${status}, ip: ${ip}, ipField: ${ipField}`
+  logger.debug(
+    `ConnectionPage: Render - status: ${status}, ip: ${ip}, ipField: ${ipField}`
   );
 
   useEffect(() => {
     if (ip) {
-      console.log(`[ConnectionPage] IP changed, updating field to: ${ip}`);
+      logger.debug(`ConnectionPage: IP changed, updating field to: ${ip}`);
       setIpField(ip);
     }
   }, [ip]);
@@ -30,24 +31,25 @@ const ConnectionPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    console.log(
-      `[ConnectionPage] Connect button clicked with IP: ${ipField.trim()}`
+    logger.info(
+      `ConnectionPage: Connect button clicked with IP: ${ipField.trim()}`
     );
     const newIp = ipField.trim();
     if (newIp !== ip) {
-      console.log(`[ConnectionPage] IP changed, calling setIp`);
+      logger.debug(`ConnectionPage: IP changed, calling setIp`);
       setIp(newIp);
     } else {
-      console.log(`[ConnectionPage] Same IP, calling reconnect`);
+      logger.debug(`ConnectionPage: Same IP, calling reconnect`);
       reconnect();
     }
   };
 
   return (
-    <TouchableWithoutFeedback
+    <Pressable
       onPress={Keyboard.dismiss}
       accessible={false}
       testID="connection-container"
+      style={{ flex: 1 }}
     >
       <SafeAreaView style={styles.container}>
         <Text style={styles.logo}>5DControl</Text>
@@ -70,7 +72,7 @@ const ConnectionPage: React.FC = () => {
           </Card>
         </View>
       </SafeAreaView>
-    </TouchableWithoutFeedback>
+    </Pressable>
   );
 };
 

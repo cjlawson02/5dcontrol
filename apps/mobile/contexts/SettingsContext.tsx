@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useReducer,
 } from "react";
+import { logger } from "../utils/logger";
 
 export type GridType = "none" | "rule-of-thirds" | "golden-ratio";
 
@@ -71,7 +72,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
       // Persist to storage
       await AsyncStorage.setItem("gridType", gridType);
     } catch (error) {
-      console.error("Settings: Error saving grid type:", error);
+      logger.error("Settings: Error saving grid type:", error);
     }
   };
 
@@ -85,7 +86,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
         payload: { gridType },
       });
     } catch (error) {
-      console.error("Settings: Error loading settings:", error);
+      logger.error("Settings: Error loading settings:", error);
     }
   };
 

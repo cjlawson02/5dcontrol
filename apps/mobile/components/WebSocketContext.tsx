@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { logger } from "../utils/logger";
 
 type ConnectionStatus = "connected" | "disconnected" | "loading";
 
@@ -60,15 +61,15 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
   const setIp = useCallback(
     async (newIp: string | null) => {
-      console.log(`[WebSocket] setIp called with: ${newIp}, current IP: ${ip}`);
+      logger.debug(`WebSocket: setIp called with: ${newIp}, current IP: ${ip}`);
       // Update state immediately
       setInternalIp(newIp);
       if (newIp) {
         try {
           await AsyncStorage.setItem(STORAGE_KEY, newIp);
-          console.log(`[WebSocket] IP saved to storage: ${newIp}`);
+          logger.debug(`WebSocket: IP saved to storage: ${newIp}`);
         } catch (error) {
-          console.error(`[WebSocket] Error saving IP to storage:`, error);
+          logger.error(`WebSocket: Error saving IP to storage:`, error);
         }
       }
     },
@@ -76,10 +77,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const reconnect = useCallback(() => {
-    console.log(`[WebSocket] reconnect called, current IP: ${ip}`);
+    logger.debug(`WebSocket: reconnect called, current IP: ${ip}`);
     setConnectionTrigger((prev) => {
-      console.log(
-        `[WebSocket] Connection trigger incrementing from ${prev} to ${
+      logger.debug(
+        `WebSocket: Connection trigger incrementing from ${prev} to ${
           prev + 1
         }`
       );
@@ -88,20 +89,20 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   }, [ip]);
 
   const loadIp = useCallback(async () => {
-    console.log(`[WebSocket] Loading IP from storage`);
+    logger.debug(`WebSocket: Loading IP from storage`);
     try {
       const savedIp = await AsyncStorage.getItem(STORAGE_KEY);
-      console.log(`[WebSocket] Saved IP from storage: ${savedIp}`);
+      logger.debug(`WebSocket: Saved IP from storage: ${savedIp}`);
       if (savedIp) {
         setIp(savedIp);
       } else {
-        console.log(`[WebSocket] No saved IP, using default: ${DEFAULT_IP}`);
+        logger.debug(`WebSocket: No saved IP, using default: ${DEFAULT_IP}`);
         setIp(DEFAULT_IP);
       }
     } catch (error) {
-      console.error(`[WebSocket] Error loading IP from storage:`, error);
+      logger.error(`WebSocket: Error loading IP from storage:`, error);
     } finally {
-      console.log(`[WebSocket] Setting initial status to disconnected`);
+      logger.debug(`WebSocket: Setting initial status to disconnected`);
       setDisconnected();
     }
   }, []);
@@ -118,47 +119,47 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   }, [loadIp]);
 
   useEffect(() => {
-    console.log(
-      `[WebSocket] useEffect triggered with IP: ${ip}, trigger: ${connectionTrigger}`
+    logger.debug(
+      `WebSocket: useEffect triggered with IP: ${ip}, trigger: ${connectionTrigger}`
     );
     if (!ip) {
-      console.log(`[WebSocket] No IP provided, skipping connection`);
+      logger.debug(`WebSocket: No IP provided, skipping connection`);
       return;
     }
 
     // Close existing connection if any
     if (wsRef.current) {
-      console.log(`[WebSocket] Closing existing connection`);
+      logger.debug(`WebSocket: Closing existing connection`);
       wsRef.current.close();
     }
 
     const wsUrl = `ws://${ip}:8888/ws`;
-    console.log(`[WebSocket] Creating new WebSocket connection to: ${wsUrl}`);
+    logger.info(`WebSocket: Creating new connection to: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log(`[WebSocket] Connection opened successfully to ${wsUrl}`);
+      logger.info(`WebSocket: Connection opened successfully to ${wsUrl}`);
       setConnected();
 
       // Request camera status
       const msg = buildCommandMessage(ControlType.QUERY_STATUS);
-      console.log(`[WebSocket] Sending QUERY_STATUS command`);
+      logger.debug(`WebSocket: Sending QUERY_STATUS command`);
       ws.send(msg);
     };
 
     ws.onclose = (e) => {
-      console.log(`[WebSocket] Connection closed:`, e.code, e.reason);
+      logger.info(`WebSocket: Connection closed:`, e.code, e.reason);
       setDisconnected();
       setCameraStatus("disconnected");
     };
 
     ws.onerror = (error) => {
-      console.error(`[WebSocket] Connection error:`, error);
+      logger.error(`WebSocket: Connection error:`, error);
     };
 
     ws.onmessage = (e) => {
-      console.log(`[WebSocket] Message received`);
+      logger.debug(`WebSocket: Message received, data type: ${typeof e.data}, is ArrayBuffer: ${e.data instanceof ArrayBuffer}`);
       const data = new Uint8Array(e.data);
       const msg = Message.getRootAsMessage(new ByteBuffer(data));
 
@@ -166,8 +167,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         const status = msg.status();
         if (status) {
           const connected = status.cameraConnected();
-          console.log(
-            `[WebSocket] Camera status: ${
+          logger.info(
+            `WebSocket: Camera status: ${
               connected ? "connected" : "disconnected"
             }`
           );
@@ -177,16 +178,17 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return () => {
-      console.log(`[WebSocket] Cleaning up connection`);
+      logger.debug(`WebSocket: Cleaning up connection`);
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [ip, connectionTrigger, setConnected, setDisconnected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ip, connectionTrigger]);
 
   const sendCommand = useCallback((type: ControlType) => {
-    console.log(`Sending command: ${ControlType[type]}`);
+    logger.debug(`WebSocket: Sending command: ${ControlType[type]}`);
     const msg = buildCommandMessage(type);
     wsRef.current?.send(msg);
   }, []);

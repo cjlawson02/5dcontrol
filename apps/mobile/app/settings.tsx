@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +15,7 @@ import {
   RuleOfThirdsIcon,
 } from "../components/GridIcons";
 import { GridType, useSettings } from "../contexts/SettingsContext";
+import { logger } from "../utils/logger";
 
 interface GridTypeOption {
   readonly id: GridType;
@@ -33,7 +34,7 @@ export default function SettingsPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleGridSelect = (gridId: GridType) => {
-    console.log("Settings: Selecting grid type:", gridId);
+    logger.info("Settings: Selecting grid type:", gridId);
     setGridType(gridId);
     setIsDropdownOpen(false);
   };
@@ -58,7 +59,7 @@ export default function SettingsPage() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Grid Overlay</Text>
 
-          <TouchableWithoutFeedback onPress={() => setIsDropdownOpen(false)}>
+          <Pressable onPress={() => setIsDropdownOpen(false)}>
             <View>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -115,7 +116,7 @@ export default function SettingsPage() {
                 </View>
               )}
             </View>
-          </TouchableWithoutFeedback>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
