@@ -14,7 +14,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func sendStatus(conn *websocket.Conn, cam *camera.CameraManager) {
+func sendStatus(conn *websocket.Conn, cam camera.CameraController) {
 	builder := flatbuffers.NewBuilder(0)
 
 	// Get real battery level from camera
@@ -38,7 +38,7 @@ func sendStatus(conn *websocket.Conn, cam *camera.CameraManager) {
 }
 
 // RunWebSocketServer starts the WebSocket handler for camera control.
-func RunWebSocketServer(cam *camera.CameraManager, updates <-chan *camera.CameraManager) {
+func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.CameraController) {
 	// Listen for camera updates
 	if updates != nil {
 		go func() {

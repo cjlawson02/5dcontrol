@@ -12,12 +12,8 @@ import (
 	"github.com/cjlawson02/5dcontrol/server/gphoto2"
 )
 
-type Frame struct {
-	Data      []byte
-	Timestamp time.Time
-}
-
-type CameraManager struct {
+// RealCamera implements CameraController for real camera hardware via GPhoto2
+type RealCamera struct {
 	camera         *gphoto2.Camera
 	ctx            *gphoto2.Context
 	LatestFrame    atomic.Pointer[Frame]
@@ -31,6 +27,9 @@ type CameraManager struct {
 	batteryQuit    chan struct{}
 }
 
+// Compile-time check to ensure RealCamera implements CameraController
+var _ CameraController = (*RealCamera)(nil)
+
 var (
 	framePool = sync.Pool{
 		New: func() any {
@@ -39,15 +38,14 @@ var (
 	}
 )
 
-func NewCameraManager() *CameraManager {
-	return &CameraManager{
+func NewRealCamera() *RealCamera {
+	return &RealCamera{
 		disconnectedCh: make(chan struct{}),
 		isConnected:    atomic.Bool{},
-		pausePreview:   make(chan bool, 1),
 	}
 }
 
-func (manager *CameraManager) Connect() error {
+func (manager *RealCamera) Connect() error {
 	if manager.isConnected.Load() {
 		return nil
 	}
@@ -88,7 +86,7 @@ func (manager *CameraManager) Connect() error {
 	return nil
 }
 
-func (manager *CameraManager) AddClient(id string) {
+func (manager *RealCamera) AddClient(id string) {
 	if !manager.isConnected.Load() {
 		return // Don't start capture if camera is not connected
 	}
@@ -102,7 +100,7 @@ func (manager *CameraManager) AddClient(id string) {
 	}
 }
 
-func (manager *CameraManager) RemoveClient(id string) {
+func (manager *RealCamera) RemoveClient(id string) {
 	if _, loaded := manager.clients.LoadAndDelete(id); loaded {
 		// Check if this was the last client
 		empty := true
@@ -120,7 +118,7 @@ func (manager *CameraManager) RemoveClient(id string) {
 	}
 }
 
-func (manager *CameraManager) CaptureImage() error {
+func (manager *RealCamera) CaptureImage() error {
 	if !manager.isConnected.Load() {
 		return fmt.Errorf("camera is not connected")
 	}
@@ -134,8 +132,7 @@ func (manager *CameraManager) CaptureImage() error {
 }
 
 // TriggerFocus attempts to trigger autofocus on the camera
-// Note: This may not work reliably with Canon 5D Mark III due to GPhoto2 limitations
-func (manager *CameraManager) TriggerFocus() error {
+func (manager *RealCamera) TriggerFocus() error {
 	if !manager.isConnected.Load() {
 		return fmt.Errorf("camera is not connected")
 	}
@@ -169,7 +166,7 @@ func (manager *CameraManager) TriggerFocus() error {
 	return nil
 }
 
-func (manager *CameraManager) RunCaptureLoop() {
+func (manager *RealCamera) RunCaptureLoop() {
 	if !manager.isConnected.Load() {
 		return // Don't run capture loop if camera is not connected
 	}
@@ -241,19 +238,19 @@ func (manager *CameraManager) RunCaptureLoop() {
 	}
 }
 
-func (manager *CameraManager) DisconnectedCh() <-chan struct{} {
+func (manager *RealCamera) DisconnectedCh() <-chan struct{} {
 	return manager.disconnectedCh
 }
 
-func (manager *CameraManager) IsConnected() bool {
+func (manager *RealCamera) IsConnected() bool {
 	return manager.isConnected.Load()
 }
 
-func (manager *CameraManager) GetLatestFrame() *Frame {
+func (manager *RealCamera) GetLatestFrame() *Frame {
 	return manager.LatestFrame.Load()
 }
 
-func (manager *CameraManager) handleDisconnect() {
+func (manager *RealCamera) handleDisconnect() {
 	// Only handle disconnect once
 	if !manager.isConnected.Swap(false) {
 		return // Already disconnected
@@ -278,7 +275,7 @@ func (manager *CameraManager) handleDisconnect() {
 	close(manager.disconnectedCh)
 }
 
-func (manager *CameraManager) Close() {
+func (manager *RealCamera) Close() {
 	if manager.camera != nil {
 		log.Println("Releasing camera...")
 		if err := manager.camera.Exit(manager.ctx); err != nil {
@@ -290,12 +287,12 @@ func (manager *CameraManager) Close() {
 }
 
 // GetBatteryLevel returns the current battery level as a percentage (0-100)
-func (manager *CameraManager) GetBatteryLevel() uint8 {
+func (manager *RealCamera) GetBatteryLevel() uint8 {
 	return uint8(manager.batteryLevel.Load())
 }
 
 // updateBatteryLevel reads the battery level from the camera and updates the stored value
-func (manager *CameraManager) updateBatteryLevel() {
+func (manager *RealCamera) updateBatteryLevel() {
 	if !manager.isConnected.Load() || manager.camera == nil || manager.ctx == nil {
 		manager.batteryLevel.Store(0)
 		return
@@ -361,7 +358,7 @@ func (manager *CameraManager) updateBatteryLevel() {
 }
 
 // runBatteryUpdateLoop periodically updates the battery level
-func (manager *CameraManager) runBatteryUpdateLoop() {
+func (manager *RealCamera) runBatteryUpdateLoop() {
 	ticker := time.NewTicker(30 * time.Second) // Update every 30 seconds
 	defer ticker.Stop()
 

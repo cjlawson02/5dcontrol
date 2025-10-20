@@ -1,0 +1,6 @@
+# Build output
+bin/
+tmp/
+
+# Air live reload
+.air.toml.swp

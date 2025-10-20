@@ -11,7 +11,7 @@ import (
 
 func TestWebSocketServer_BasicConnection(t *testing.T) {
 	// Create a real camera manager for testing
-	camManager := camera.NewCameraManager()
+	camManager := camera.NewRealCamera()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func TestWebSocketServer_UpgradeError(t *testing.T) {
 
 func TestWebSocketServer_ConnectionClose(t *testing.T) {
 	// Create a real camera manager for testing
-	camManager := camera.NewCameraManager()
+	camManager := camera.NewRealCamera()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +118,7 @@ func TestWebSocketServer_ConnectionClose(t *testing.T) {
 
 func TestWebSocketServer_SendStatus(t *testing.T) {
 	// Create a real camera manager for testing
-	camManager := camera.NewCameraManager()
+	camManager := camera.NewRealCamera()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +159,7 @@ func TestWebSocketServer_SendStatus(t *testing.T) {
 
 func TestWebSocketServer_MultipleConnections(t *testing.T) {
 	// Create a real camera manager for testing
-	camManager := camera.NewCameraManager()
+	camManager := camera.NewRealCamera()
 
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

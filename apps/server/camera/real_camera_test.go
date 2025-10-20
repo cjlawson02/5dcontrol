@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-func TestNewCameraManager(t *testing.T) {
-	manager := NewCameraManager()
+func TestNewRealCamera(t *testing.T) {
+	manager := NewRealCamera()
 
 	if manager == nil {
-		t.Fatal("NewCameraManager() returned nil")
+		t.Fatal("NewRealCamera() returned nil")
 	}
 
 	if manager.isConnected.Load() {
@@ -30,8 +30,8 @@ func TestNewCameraManager(t *testing.T) {
 	}
 }
 
-func TestCameraManager_IsConnected(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_IsConnected(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Initially disconnected
 	if manager.IsConnected() {
@@ -45,8 +45,8 @@ func TestCameraManager_IsConnected(t *testing.T) {
 	}
 }
 
-func TestCameraManager_GetLatestFrame(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_GetLatestFrame(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Initially no frame
 	frame := manager.GetLatestFrame()
@@ -71,8 +71,8 @@ func TestCameraManager_GetLatestFrame(t *testing.T) {
 	}
 }
 
-func TestCameraManager_GetBatteryLevel(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_GetBatteryLevel(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Initially 0
 	level := manager.GetBatteryLevel()
@@ -88,8 +88,8 @@ func TestCameraManager_GetBatteryLevel(t *testing.T) {
 	}
 }
 
-func TestCameraManager_AddClient(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_AddClient(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Add client when disconnected - should not start capture
 	manager.AddClient("client1")
@@ -128,8 +128,8 @@ func TestCameraManager_AddClient(t *testing.T) {
 	}
 }
 
-func TestCameraManager_RemoveClient(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_RemoveClient(t *testing.T) {
+	manager := NewRealCamera()
 	manager.isConnected.Store(true)
 
 	// Add two clients
@@ -170,8 +170,8 @@ func TestCameraManager_RemoveClient(t *testing.T) {
 	}
 }
 
-func TestCameraManager_CaptureImage(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_CaptureImage(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Try to capture when disconnected - should return error
 	err := manager.CaptureImage()
@@ -187,8 +187,8 @@ func TestCameraManager_CaptureImage(t *testing.T) {
 	// This test mainly verifies the connection check
 }
 
-func TestCameraManager_TriggerFocus(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_TriggerFocus(t *testing.T) {
+	manager := NewRealCamera()
 
 	// Try to focus when disconnected - should return error
 	err := manager.TriggerFocus()
@@ -204,8 +204,8 @@ func TestCameraManager_TriggerFocus(t *testing.T) {
 	// This test mainly verifies the connection check
 }
 
-func TestCameraManager_DisconnectedCh(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_DisconnectedCh(t *testing.T) {
+	manager := NewRealCamera()
 
 	ch := manager.DisconnectedCh()
 	if ch == nil {
@@ -219,8 +219,8 @@ func TestCameraManager_DisconnectedCh(t *testing.T) {
 	}
 }
 
-func TestCameraManager_handleDisconnect(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_handleDisconnect(t *testing.T) {
+	manager := NewRealCamera()
 	manager.isConnected.Store(true)
 
 	// Set up some state
@@ -281,8 +281,8 @@ func TestFramePool(t *testing.T) {
 	// This is expected behavior
 }
 
-func TestCameraManager_ConcurrentAccess(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_ConcurrentAccess(t *testing.T) {
+	manager := NewRealCamera()
 	manager.isConnected.Store(true)
 
 	var wg sync.WaitGroup
@@ -332,8 +332,8 @@ func TestCameraManager_ConcurrentAccess(t *testing.T) {
 	}
 }
 
-func TestCameraManager_BatteryLevelUpdate(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_BatteryLevelUpdate(t *testing.T) {
+	manager := NewRealCamera()
 	manager.isConnected.Store(true)
 
 	// Test battery level clamping
@@ -352,8 +352,8 @@ func TestCameraManager_BatteryLevelUpdate(t *testing.T) {
 	}
 }
 
-func TestCameraManager_Close(t *testing.T) {
-	manager := NewCameraManager()
+func TestRealCamera_Close(t *testing.T) {
+	manager := NewRealCamera()
 	manager.isConnected.Store(true)
 
 	// Set up some state

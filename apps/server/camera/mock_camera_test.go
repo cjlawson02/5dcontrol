@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-func TestNewMockCamera(t *testing.T) {
-	mock := NewMockCamera()
+func TestNewMockCameraDevice(t *testing.T) {
+	mock := newMockCameraDevice()
 
 	if mock == nil {
-		t.Fatal("NewMockCamera() returned nil")
+		t.Fatal("newMockCameraDevice() returned nil")
 	}
 
 	if mock.frameCount != 0 {
@@ -20,8 +20,8 @@ func TestNewMockCamera(t *testing.T) {
 	}
 }
 
-func TestMockCamera_GenerateFrame(t *testing.T) {
-	mock := NewMockCamera()
+func TestMockCameraDevice_GenerateFrame(t *testing.T) {
+	mock := newMockCameraDevice()
 
 	// Generate first frame
 	data1, err := mock.GenerateFrame()
@@ -56,8 +56,8 @@ func TestMockCamera_GenerateFrame(t *testing.T) {
 	}
 }
 
-func TestMockCamera_GenerateFrame_ImageProperties(t *testing.T) {
-	mock := NewMockCamera()
+func TestMockCameraDevice_GenerateFrame_ImageProperties(t *testing.T) {
+	mock := newMockCameraDevice()
 
 	data, err := mock.GenerateFrame()
 	if err != nil {
@@ -83,15 +83,15 @@ func TestMockCamera_GenerateFrame_ImageProperties(t *testing.T) {
 	}
 }
 
-func TestNewMockCameraManager(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestNewMockCamera(t *testing.T) {
+	mockManager := NewMockCamera()
 
 	if mockManager == nil {
-		t.Fatal("NewMockCameraManager() returned nil")
+		t.Fatal("NewMockCamera() returned nil")
 	}
 
-	if mockManager.CameraManager == nil {
-		t.Error("Expected CameraManager to be initialized")
+	if mockManager.RealCamera == nil {
+		t.Error("Expected RealCamera to be initialized")
 	}
 
 	if mockManager.mockCam == nil {
@@ -99,8 +99,8 @@ func TestNewMockCameraManager(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_Connect(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_Connect(t *testing.T) {
+	mockManager := NewMockCamera()
 
 	err := mockManager.Connect()
 	if err != nil {
@@ -120,8 +120,8 @@ func TestMockCameraManager_Connect(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_AddClient(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_AddClient(t *testing.T) {
+	mockManager := NewMockCamera()
 
 	// Add client when disconnected - should not start capture
 	mockManager.AddClient("client1")
@@ -150,8 +150,8 @@ func TestMockCameraManager_AddClient(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_CaptureImage(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_CaptureImage(t *testing.T) {
+	mockManager := NewMockCamera()
 
 	// Capture when disconnected - should not error
 	err := mockManager.CaptureImage()
@@ -169,8 +169,8 @@ func TestMockCameraManager_CaptureImage(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_RunMockCaptureLoop(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_RunMockCaptureLoop(t *testing.T) {
+	mockManager := NewMockCamera()
 	mockManager.isConnected.Store(true)
 	mockManager.capturing.Store(true)
 	mockManager.captureQuit = make(chan struct{})
@@ -194,8 +194,8 @@ func TestMockCameraManager_RunMockCaptureLoop(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
-func TestMockCameraManager_PauseResume(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_PauseResume(t *testing.T) {
+	mockManager := NewMockCamera()
 	mockManager.isConnected.Store(true)
 	mockManager.capturing.Store(true)
 	mockManager.captureQuit = make(chan struct{})
@@ -256,7 +256,7 @@ func TestMockCamera_FrameAnimation(t *testing.T) {
 	// Generate multiple frames and verify they're different
 	frames := make([][]byte, 5)
 	for i := 0; i < 5; i++ {
-		data, err := mock.GenerateFrame()
+		data, err := mock.mockCam.GenerateFrame()
 		if err != nil {
 			t.Fatalf("GenerateFrame() failed: %v", err)
 		}
@@ -278,7 +278,7 @@ func TestMockCamera_FrameConsistency(t *testing.T) {
 
 	// Generate frames and verify they're valid JPEG
 	for i := 0; i < 10; i++ {
-		data, err := mock.GenerateFrame()
+		data, err := mock.mockCam.GenerateFrame()
 		if err != nil {
 			t.Fatalf("GenerateFrame() failed on iteration %d: %v", i, err)
 		}
@@ -296,8 +296,8 @@ func TestMockCamera_FrameConsistency(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_ConcurrentAccess(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_ConcurrentAccess(t *testing.T) {
+	mockManager := NewMockCamera()
 	mockManager.isConnected.Store(true)
 
 	// Test concurrent client operations
@@ -328,8 +328,8 @@ func TestMockCameraManager_ConcurrentAccess(t *testing.T) {
 	}
 }
 
-func TestMockCameraManager_FrameGeneration(t *testing.T) {
-	mockManager := NewMockCameraManager()
+func TestMockCamera_FrameGeneration(t *testing.T) {
+	mockManager := NewMockCamera()
 	mockManager.isConnected.Store(true)
 	mockManager.capturing.Store(true)
 	mockManager.captureQuit = make(chan struct{})

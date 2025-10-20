@@ -13,20 +13,20 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// MockCamera simulates a camera for demo/testing purposes
-type MockCamera struct {
+// mockCameraDevice simulates a camera for demo/testing purposes
+type mockCameraDevice struct {
 	frameCount int
 }
 
-// NewMockCamera creates a new mock camera instance
-func NewMockCamera() *MockCamera {
-	return &MockCamera{
+// newMockCameraDevice creates a new mock camera device instance
+func newMockCameraDevice() *mockCameraDevice {
+	return &mockCameraDevice{
 		frameCount: 0,
 	}
 }
 
 // GenerateFrame creates a synthetic preview frame
-func (m *MockCamera) GenerateFrame() ([]byte, error) {
+func (m *mockCameraDevice) GenerateFrame() ([]byte, error) {
 	m.frameCount++
 
 	// Create a 1920x1080 image
@@ -98,22 +98,25 @@ func addLabel(img *image.RGBA, x, y int, label string) {
 	}
 }
 
-// MockCameraManager wraps a regular CameraManager to use mock camera
-type MockCameraManager struct {
-	*CameraManager
-	mockCam *MockCamera
+// MockCamera wraps a regular RealCamera to use mock camera
+type MockCamera struct {
+	*RealCamera
+	mockCam *mockCameraDevice
 }
 
-// NewMockCameraManager creates a camera manager that uses mock camera
-func NewMockCameraManager() *MockCameraManager {
-	return &MockCameraManager{
-		CameraManager: NewCameraManager(),
-		mockCam:       NewMockCamera(),
+// Compile-time check to ensure MockCamera implements CameraController
+var _ CameraController = (*MockCamera)(nil)
+
+// NewMockCamera creates a camera controller that uses mock camera
+func NewMockCamera() *MockCamera {
+	return &MockCamera{
+		RealCamera: NewRealCamera(),
+		mockCam:    newMockCameraDevice(),
 	}
 }
 
 // Connect simulates camera connection
-func (m *MockCameraManager) Connect() error {
+func (m *MockCamera) Connect() error {
 	log.Println("Mock camera: Simulating connection...")
 	m.isConnected.Store(true)
 	m.captureQuit = make(chan struct{})
@@ -122,7 +125,7 @@ func (m *MockCameraManager) Connect() error {
 }
 
 // RunMockCaptureLoop generates synthetic frames
-func (m *MockCameraManager) RunMockCaptureLoop() {
+func (m *MockCamera) RunMockCaptureLoop() {
 	log.Println("Mock camera: Starting capture loop...")
 
 	var frameCount int
@@ -178,7 +181,7 @@ func (m *MockCameraManager) RunMockCaptureLoop() {
 }
 
 // AddClient starts the mock capture loop when first client connects
-func (m *MockCameraManager) AddClient(id string) {
+func (m *MockCamera) AddClient(id string) {
 	if !m.isConnected.Load() {
 		return
 	}
@@ -193,7 +196,7 @@ func (m *MockCameraManager) AddClient(id string) {
 }
 
 // CaptureImage simulates taking a photo
-func (m *MockCameraManager) CaptureImage() error {
+func (m *MockCamera) CaptureImage() error {
 	if !m.isConnected.Load() {
 		return nil
 	}

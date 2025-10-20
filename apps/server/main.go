@@ -19,18 +19,18 @@ func main() {
 	// start mDNS discovery
 	go discovery.RunMDNSDiscovery()
 
-	// create initial camera manager and update channel
-	camCh := make(chan *camera.CameraManager)
+	// create initial camera controller and update channel
+	camCh := make(chan camera.CameraController)
 
 	if *demoMode {
 		log.Println("Starting in DEMO MODE with mock camera")
-		mockCam := camera.NewMockCameraManager()
+		mockCam := camera.NewMockCamera()
 
 		// start HTTP MJPEG + snapshot server (no updates channel in demo mode)
 		go server.RunHTTPServer(mockCam, nil)
 
 		// start WebSocket control server (no updates channel in demo mode)
-		go server.RunWebSocketServer(mockCam.CameraManager, nil)
+		go server.RunWebSocketServer(mockCam, nil)
 
 		// Auto-connect mock camera
 		go func() {
@@ -44,7 +44,7 @@ func main() {
 		}()
 	} else {
 		log.Println("Starting with real camera")
-		cam := camera.NewCameraManager()
+		cam := camera.NewRealCamera()
 
 		// start HTTP MJPEG + snapshot server
 		go server.RunHTTPServer(cam, camCh)
