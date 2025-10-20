@@ -1,9 +1,9 @@
 module.exports = {
-  preset: "@testing-library/react-native",
+  preset: "jest-expo",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
-  testPathIgnorePatterns: ["/node_modules/", "/android/", "/ios/"],
+  testPathIgnorePatterns: ["/node_modules/", "/android/", "/ios/", ".*\\.util\\.(ts|tsx)$"],
   transformIgnorePatterns: [
-    "node_modules/(?!(react-native|@react-native|@react-native-community|@testing-library|expo|@expo|react-native-.*|@react-native-.*|@rneui|ws)/)",
+    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@rneui/.*)",
   ],
   collectCoverageFrom: [
     "**/*.{ts,tsx}",
@@ -20,10 +20,6 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
     "^@proto/(.*)$": "<rootDir>/../../packages/proto/dist/$1",
-  },
-  testEnvironment: "jsdom",
-  testEnvironmentOptions: {
-    customExportConditions: ["node", "node-addons"],
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   testTimeout: 30000, // Increased timeout for integration tests
