@@ -1,3 +1,4 @@
+import { PageLayout } from "@/components/PageLayout";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -8,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
   GoldenRatioIcon,
   NoGridIcon,
@@ -46,15 +46,7 @@ export default function SettingsPage() {
   const selectedGrid = GRID_TYPES.find((grid) => grid.id === state.gridType);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
-        <View style={styles.placeholder} />
-      </View>
-
+    <PageLayout title="Settings" onBack={handleBack}>
       <ScrollView style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Grid Overlay</Text>
@@ -119,40 +111,11 @@ export default function SettingsPage() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333",
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  title: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  placeholder: {
-    width: 60, // Same width as back button for centering
-  },
   content: {
     flex: 1,
     padding: 20,

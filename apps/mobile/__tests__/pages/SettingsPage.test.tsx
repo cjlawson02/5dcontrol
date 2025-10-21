@@ -123,41 +123,6 @@ describe("SettingsPage", () => {
     expect(queryByText("Rule of Thirds")).toBeNull();
   });
 
-  // Skipped: TouchableWithoutFeedback interaction is difficult to test properly
-  it.skip("should close dropdown when touching outside", () => {
-    const { getByText, queryByText, getAllByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    // Find dropdown button by looking for any grid type text
-    const gridTypeTexts = ["No Grid", "Rule of Thirds", "Golden Ratio"];
-    let dropdownButton;
-    for (const text of gridTypeTexts) {
-      try {
-        const elements = getAllByText(text);
-        dropdownButton = elements[0].parent?.parent;
-        if (dropdownButton) break;
-      } catch (e) {
-        continue;
-      }
-    }
-
-    // Open dropdown
-    fireEvent.press(dropdownButton!);
-
-    // Verify dropdown is open by checking for multiple grid options
-    expect(getAllByText("Rule of Thirds").length > 0).toBeTruthy();
-
-    // Close dropdown by pressing button again
-    fireEvent.press(dropdownButton!);
-
-    // Verify dropdown is closed - should only see the selected option
-    const ruleOfThirdsElements = getAllByText("Rule of Thirds");
-    expect(ruleOfThirdsElements.length).toBe(1);
-  });
-
   it("should call setGridType when grid option is selected", async () => {
     const { getByText } = render(
       <TestWrapper>
@@ -201,20 +166,6 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(queryByText("Rule of Thirds")).toBeNull();
     });
-  });
-
-  // Skipped: expo-router mocking is problematic - router.back() cannot be properly mocked
-  it.skip("should handle back navigation", () => {
-    const { getByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    const backButton = getByText("← Back");
-    fireEvent.press(backButton);
-
-    expect(mockRouter.back).toHaveBeenCalled();
   });
 
   it("should show selected grid type with checkmark", () => {
