@@ -1,5 +1,4 @@
 import { render } from "@testing-library/react-native";
-import React from "react";
 import { GridOverlay } from "../../components/GridOverlay";
 import { GridType } from "../../contexts/SettingsContext";
 

@@ -3,11 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "strict": true,
-    "paths": {
-      "@/*": ["./*"],
-      "@proto/*": ["../../packages/proto/dist/*"]
-    }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "__tests__"]
+  "exclude": ["node_modules", "dist"]
 }

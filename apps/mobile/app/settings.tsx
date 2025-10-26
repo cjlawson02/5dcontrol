@@ -1,4 +1,3 @@
-import { PageLayout } from "@/components/PageLayout";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -14,6 +13,7 @@ import {
   NoGridIcon,
   RuleOfThirdsIcon,
 } from "../components/GridIcons";
+import { PageLayout } from "../components/PageLayout";
 import { GridType, useSettings } from "../contexts/SettingsContext";
 import { logger } from "../utils/logger";
 

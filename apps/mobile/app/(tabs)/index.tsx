@@ -1,17 +1,17 @@
-import { CameraStream } from "@/components/CameraStream";
-import { CaptureButton } from "@/components/CaptureButton";
-import { GridOverlay } from "@/components/GridOverlay";
-import { TopStatusBar } from "@/components/TopStatusBar";
-import { useWebSocketContext } from "@/components/WebSocketContext";
-import { useSettings } from "@/contexts/SettingsContext";
-import { ControlType } from "@proto/control";
+import { ControlType } from "@5dcontrol/proto";
 import { Icon, LinearProgress, Text } from "@rneui/themed";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { logger } from "@/utils/logger";
+import { CameraStream } from "../../components/CameraStream";
+import { CaptureButton } from "../../components/CaptureButton";
+import { GridOverlay } from "../../components/GridOverlay";
+import { TopStatusBar } from "../../components/TopStatusBar";
+import { useWebSocketContext } from "../../components/WebSocketContext";
+import { useSettings } from "../../contexts/SettingsContext";
+import { logger } from "../../utils/logger";
 
 export default function HomeScreen() {
   const [fps, setFps] = useState(0);

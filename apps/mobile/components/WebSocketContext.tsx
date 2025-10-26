@@ -1,4 +1,4 @@
-import { Command, ControlType, Message, MessageType } from "@proto/control";
+import { Command, ControlType, Message, MessageType } from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Builder, ByteBuffer } from "flatbuffers";
 import React, {

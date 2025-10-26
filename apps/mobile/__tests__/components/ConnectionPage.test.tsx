@@ -1,5 +1,4 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
-import React from "react";
 import ConnectionPage from "../../components/ConnectionPage";
 
 // Mock AsyncStorage
@@ -14,8 +13,8 @@ jest.mock("@react-native-async-storage/async-storage", () => mockAsyncStorage);
 
 // Mock the WebSocket context
 const mockWebSocketContext = {
-  status: "disconnected" as const,
-  cameraStatus: "disconnected" as const,
+  status: "disconnected",
+  cameraStatus: "disconnected",
   ip: "192.168.1.1",
   setIp: jest.fn(),
   reconnect: jest.fn(),
@@ -89,9 +88,8 @@ describe("ConnectionPage", () => {
   });
 
   it("should call reconnect when IP is the same and connect button is pressed", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText } = render(<ConnectionPage />);
 
-    const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
     // Don't change the IP

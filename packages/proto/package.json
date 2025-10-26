@@ -1,6 +1,11 @@
 {
     "name": "@5dcontrol/proto",
     "private": true,
+    "main": "dist/control.js",
+    "types": "dist/control.d.ts",
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "proto": "rm -rf dist && flatc --go --go-namespace dist control.fbs && flatc --ts --ts-no-import-ext -o dist control.fbs",
         "dev": "echo 'Proto package does not need dev mode'",

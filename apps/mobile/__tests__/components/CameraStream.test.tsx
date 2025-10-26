@@ -1,20 +1,18 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import React from 'react';
 import { CameraStream } from '../../components/CameraStream';
 
 // Mock react-native-webview
 jest.mock('react-native-webview', () => {
-  const { View } = require('react-native');
   return {
     __esModule: true,
-    default: ({ onMessage, source, ...props }) => {
+    default: (props: any) => {
+      const { View } = require('react-native');
       const MockWebView = View;
       return (
-        <MockWebView 
-          {...props} 
+        <MockWebView
+          {...props}
           testID="webview"
-          onMessage={onMessage}
-          source={source}
         />
       );
     },
@@ -40,7 +38,7 @@ describe('CameraStream', () => {
     const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
-    
+
     // Simulate receiving a "frame" message
     fireEvent(webView, 'onMessage', {
       nativeEvent: { data: 'frame' }
@@ -54,7 +52,7 @@ describe('CameraStream', () => {
     const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
-    
+
     // Simulate receiving a non-frame message
     fireEvent(webView, 'onMessage', {
       nativeEvent: { data: 'other-message' }
@@ -68,7 +66,7 @@ describe('CameraStream', () => {
     const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
-    
+
     // Simulate receiving multiple frame messages
     fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
     fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
@@ -101,7 +99,7 @@ describe('CameraStream', () => {
     const { getByTestId } = render(<CameraStream url={url} onFrame={undefined as any} />);
 
     const webView = getByTestId('webview');
-    
+
     // Should not throw error when onFrame is undefined
     expect(() => {
       fireEvent(webView, 'onMessage', {
@@ -115,7 +113,7 @@ describe('CameraStream', () => {
     const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
-    
+
     // Mix of frame and non-frame messages
     fireEvent(webView, 'onMessage', { nativeEvent: { data: 'other' } });
     fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });

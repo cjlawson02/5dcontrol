@@ -3,7 +3,7 @@ module.exports = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testPathIgnorePatterns: ["/node_modules/", "/android/", "/ios/", ".*\\.util\\.(ts|tsx)$"],
   transformIgnorePatterns: [
-    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@rneui/.*)",
+    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@rneui/.*|@5dcontrol/proto)",
   ],
   collectCoverageFrom: [
     "**/*.{ts,tsx}",
@@ -19,7 +19,7 @@ module.exports = {
   ],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
-    "^@proto/(.*)$": "<rootDir>/../../packages/proto/dist/$1",
+    "^@5dcontrol/proto$": "<rootDir>/../../packages/proto/dist/control.ts",
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   testTimeout: 30000, // Increased timeout for integration tests

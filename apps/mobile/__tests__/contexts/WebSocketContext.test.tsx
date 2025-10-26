@@ -1,4 +1,4 @@
-import { ControlType } from "@proto/control";
+import { ControlType } from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
@@ -6,36 +6,6 @@ import {
   WebSocketProvider,
   useWebSocketContext,
 } from "../../components/WebSocketContext";
-
-// Mock the proto module
-jest.mock("@proto/control", () => ({
-  ControlType: {
-    FOCUS: 1,
-    CAPTURE: 2,
-    QUERY_STATUS: 3,
-  },
-  MessageType: {
-    COMMAND: 1,
-    STATUS: 2,
-  },
-  Command: {
-    startCommand: jest.fn(),
-    addType: jest.fn(),
-    endCommand: jest.fn(),
-  },
-  Message: {
-    startMessage: jest.fn(),
-    addMessageType: jest.fn(),
-    addCommand: jest.fn(),
-    endMessage: jest.fn(),
-    getRootAsMessage: jest.fn(() => ({
-      messageType: () => 2, // STATUS
-      status: () => ({
-        cameraConnected: () => true,
-      }),
-    })),
-  },
-}));
 
 const mockAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 
@@ -130,7 +100,7 @@ describe("WebSocketContext", () => {
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
       await act(async () => {
-        await result.current.setIp("192.168.1.200");
+        result.current.setIp("192.168.1.200");
       });
 
       // State should be updated immediately
@@ -151,7 +121,7 @@ describe("WebSocketContext", () => {
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
       await act(async () => {
-        await result.current.setIp("192.168.1.200");
+        result.current.setIp("192.168.1.200");
       });
 
       // State should be updated immediately
@@ -194,7 +164,7 @@ describe("WebSocketContext", () => {
         onmessage: null,
       };
 
-      (global.WebSocket as jest.Mock).mockImplementation(() => mockWebSocket);
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <WebSocketProvider>{children}</WebSocketProvider>
@@ -226,7 +196,7 @@ describe("WebSocketContext", () => {
 
       // Mock WebSocket to be null
       const originalWebSocket = global.WebSocket;
-      global.WebSocket = jest.fn().mockImplementation(() => null);
+      global.WebSocket = jest.fn().mockImplementation(() => null) as any;
 
       act(() => {
         result.current.sendCommand(ControlType.FOCUS);
@@ -258,13 +228,13 @@ describe("WebSocketContext", () => {
       const mockWebSocket = {
         close: jest.fn(),
         send: jest.fn(),
-        onopen: null,
-        onclose: null,
+        onopen: jest.fn(),
+        onclose: jest.fn(),
         onerror: null,
         onmessage: null,
       };
 
-      (global.WebSocket as jest.Mock).mockImplementation(() => mockWebSocket);
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <WebSocketProvider>{children}</WebSocketProvider>
@@ -306,11 +276,11 @@ describe("WebSocketContext", () => {
         send: jest.fn(),
         onopen: null,
         onclose: null,
-        onerror: null,
+        onerror: jest.fn(),
         onmessage: null,
       };
 
-      (global.WebSocket as jest.Mock).mockImplementation(() => mockWebSocket);
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <WebSocketProvider>{children}</WebSocketProvider>
@@ -340,10 +310,10 @@ describe("WebSocketContext", () => {
         onopen: null,
         onclose: null,
         onerror: null,
-        onmessage: null,
+        onmessage: jest.fn(),
       };
 
-      (global.WebSocket as jest.Mock).mockImplementation(() => mockWebSocket);
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <WebSocketProvider>{children}</WebSocketProvider>
@@ -402,13 +372,13 @@ describe("WebSocketContext", () => {
       });
 
       // First connection
-      await act(async () => {
-        await result.current.setIp("192.168.1.100");
+      act(() => {
+        result.current.setIp("192.168.1.100");
       });
 
       // Second connection should close the first one
-      await act(async () => {
-        await result.current.setIp("192.168.1.200");
+      act(() => {
+        result.current.setIp("192.168.1.200");
       });
 
       expect(mockWebSocket1.close).toHaveBeenCalled();

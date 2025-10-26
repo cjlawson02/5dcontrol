@@ -1,5 +1,4 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
-import React from "react";
 import SettingsPage from "../../app/settings";
 
 // Mock expo-router
@@ -25,7 +24,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 
 // Mock settings context
 const mockSettingsContext = {
-  state: { gridType: "none" as const },
+  state: { gridType: "none" },
   setGridType: jest.fn(),
 };
 
@@ -36,21 +35,27 @@ jest.mock("../../contexts/SettingsContext", () => ({
 
 // Mock GridIcons
 jest.mock("../../components/GridIcons", () => ({
-  NoGridIcon: ({ size, color }: { size?: number; color?: string }) =>
-    require("react").createElement("View", {
+  NoGridIcon: ({ size, color }: { size?: number; color?: string }) => {
+    const React = require("react");
+    return React.createElement("View", {
       testID: "no-grid-icon",
       style: { width: size, height: size },
-    }),
-  RuleOfThirdsIcon: ({ size, color }: { size?: number; color?: string }) =>
-    require("react").createElement("View", {
+    });
+  },
+  RuleOfThirdsIcon: ({ size, color }: { size?: number; color?: string }) => {
+    const React = require("react");
+    return React.createElement("View", {
       testID: "rule-of-thirds-icon",
       style: { width: size, height: size },
-    }),
-  GoldenRatioIcon: ({ size, color }: { size?: number; color?: string }) =>
-    require("react").createElement("View", {
+    });
+  },
+  GoldenRatioIcon: ({ size, color }: { size?: number; color?: string }) => {
+    const React = require("react");
+    return React.createElement("View", {
       testID: "golden-ratio-icon",
       style: { width: size, height: size },
-    }),
+    });
+  },
 }));
 
 // Don't wrap with SettingsProvider - use the mocked context instead
@@ -66,7 +71,7 @@ describe("SettingsPage", () => {
   });
 
   it("should render correctly", () => {
-    const { getByText, getByTestId } = render(
+    const { getByText } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -91,7 +96,7 @@ describe("SettingsPage", () => {
   });
 
   it("should open dropdown when button is pressed", () => {
-    const { getByText, queryByText } = render(
+    const { getByText } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -267,7 +272,7 @@ describe("SettingsPage", () => {
       try {
         getAllByText(text);
         return true;
-      } catch (e) {
+      } catch {
         return false;
       }
     });
@@ -275,7 +280,7 @@ describe("SettingsPage", () => {
   });
 
   it("should handle selection of different grid types", async () => {
-    const { getByText, getAllByText } = render(
+    const { getAllByText } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -289,7 +294,7 @@ describe("SettingsPage", () => {
         const elements = getAllByText(text);
         dropdownButton = elements[0].parent?.parent;
         if (dropdownButton) break;
-      } catch (e) {
+      } catch {
         continue;
       }
     }
