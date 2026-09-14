@@ -21,13 +21,14 @@ go run . -demo
 npm run dev -- -demo
 ```
 
-Confirm in logs that the mock camera is active. Live view serves synthetic MJPEG frames (typically labeled for demo) on `:8080`, and WebSocket control on `:8888` accepts FOCUS / CAPTURE / QUERY_STATUS against the mock.
+Confirm in logs that the mock camera is active. Live view serves synthetic MJPEG frames (typically labeled for demo) on `:8080`, and WebSocket control on `:8888` accepts FOCUS / CAPTURE / QUERY_STATUS against the mock. After CAPTURE, the mock caches a labeled still and broadcasts `IMAGE_READY`; the app should show a last-thumb and populate gallery via `/captures/…`.
 
 ## Mobile
 
 1. Start Expo (`npm run dev` in `apps/mobile` if not using `dev:demo`).
 2. On the connection screen, enter the **host machine’s LAN IPv4** (not `127.0.0.1` from a physical device).
 3. Simulator/emulator on the same machine may use the host loopback or LAN IP depending on platform; prefer the LAN IP for consistency with device testing.
+4. On the viewfinder, quick-release the shutter control to capture; hold ~300ms to focus. A last-capture thumb should appear after notify.
 
 ## What demo mode covers
 
@@ -36,7 +37,8 @@ Confirm in logs that the mock camera is active. Live view serves synthetic MJPEG
 | Live view | Synthetic frames |
 | Focus / capture commands | Accepted; no real shutter |
 | Battery / connection status | Simulated |
-| Gallery / image download | Thin path: fetch `photo.jpg` into local cache (same as production slice) |
+| Capture → review | Mock still cached; WS `IMAGE_READY`; HTTP `/captures/{id}/full.jpg` + thumb |
+| Gallery / image download | Auto-fetch on notify; manual fetch still supported (`photo.jpg` = live snapshot) |
 | Real exposure settings enumeration | Not productized on the wire yet |
 
 ## Related flags

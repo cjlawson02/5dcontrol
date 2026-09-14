@@ -21,10 +21,17 @@ const mockWebSocket = {
   status: "connected" as const,
   cameraStatus: "connected" as const,
   batteryLevel: 80,
+  lastImageReady: null as null | {
+    imageId: string;
+    thumbPath: string;
+    fullPath: string;
+    receivedAt: number;
+  },
   setIp: jest.fn(),
   reconnect: jest.fn(),
   connect: jest.fn(),
   sendCommand: jest.fn(),
+  clearLastImageReady: jest.fn(),
 };
 
 jest.mock("../../components/WebSocketContext", () => ({
@@ -38,6 +45,7 @@ jest.mock("../../utils/galleryCache", () => {
     listGalleryImages: jest.fn(() => []),
     seedAllGalleryCaches: jest.fn(async () => undefined),
     downloadLatestSnapshot: jest.fn(),
+    downloadCaptureStill: jest.fn(),
   };
 });
 
@@ -47,6 +55,7 @@ describe("GalleryScreen", () => {
     (global as any).__resetExpoFsStore?.();
     (global as any).__resetExpoImageCache?.();
     mockWebSocket.ip = "192.168.1.1";
+    mockWebSocket.lastImageReady = null;
     (galleryCache.listGalleryImages as jest.Mock).mockReturnValue([]);
     (galleryCache.seedAllGalleryCaches as jest.Mock).mockResolvedValue(
       undefined

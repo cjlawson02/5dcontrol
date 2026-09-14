@@ -1,8 +1,10 @@
 import {
   cacheKeyForFilename,
+  downloadCaptureStill,
   downloadLatestSnapshot,
   ensureGalleryDirectory,
   listGalleryImages,
+  mediaUrlForIp,
   photoUrlForIp,
   seedExpoImageCache,
 } from "../../utils/galleryCache";
@@ -17,6 +19,15 @@ describe("galleryCache", () => {
 
   it("builds the photo.jpg URL for a server IP", () => {
     expect(photoUrlForIp("192.168.1.1")).toBe("http://192.168.1.1:8080/photo.jpg");
+  });
+
+  it("builds media URLs from HTTP paths", () => {
+    expect(mediaUrlForIp("10.0.0.1", "/captures/9/full.jpg")).toBe(
+      "http://10.0.0.1:8080/captures/9/full.jpg"
+    );
+    expect(mediaUrlForIp("10.0.0.1", "captures/9/thumb.jpg")).toBe(
+      "http://10.0.0.1:8080/captures/9/thumb.jpg"
+    );
   });
 
   it("builds stable cache keys", () => {
@@ -61,6 +72,22 @@ describe("galleryCache", () => {
     expect(spy).toHaveBeenCalledWith(
       "http://192.168.1.50:8080/photo.jpg",
       expect.objectContaining({ name: expect.stringMatching(/^capture-\d+\.jpg$/) }),
+      { idempotent: true }
+    );
+    spy.mockRestore();
+  });
+
+  it("downloads a capture still from IMAGE_READY paths", async () => {
+    const spy = jest.spyOn(File, "downloadFileAsync");
+    const image = await downloadCaptureStill(
+      "192.168.1.50",
+      "/captures/12345/full.jpg",
+      "12345"
+    );
+    expect(image.filename).toBe("capture-12345.jpg");
+    expect(spy).toHaveBeenCalledWith(
+      "http://192.168.1.50:8080/captures/12345/full.jpg",
+      expect.objectContaining({ name: "capture-12345.jpg" }),
       { idempotent: true }
     );
     spy.mockRestore();

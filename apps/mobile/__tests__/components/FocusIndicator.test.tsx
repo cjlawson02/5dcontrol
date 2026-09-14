@@ -45,4 +45,11 @@ describe("FocusIndicator", () => {
     const indicator = getByTestId("focus-indicator");
     expect(indicator).toBeTruthy();
   });
+
+  it("should render centered mode", () => {
+    const { getByTestId } = render(
+      <FocusIndicator x={0} y={0} centered />
+    );
+    expect(getByTestId("focus-indicator")).toBeTruthy();
+  });
 });

@@ -4,13 +4,14 @@ enum ControlType:byte {
   NONE = 0,
   FOCUS = 1,
   CAPTURE = 2,
-  QUERY_STATUS = 3  // New command
+  QUERY_STATUS = 3
 }
 
 enum MessageType:byte {
   UNKNOWN = 0,
   COMMAND = 1,
-  STATUS = 2
+  STATUS = 2,
+  IMAGE_READY = 3
 }
 
 table Command {
@@ -22,10 +23,19 @@ table Status {
   battery_level:uint8;
 }
 
+// Paths are HTTP paths on :8080 (e.g. /captures/{id}/full.jpg).
+// Clients prepend http://{serverIp}:8080.
+table ImageReady {
+  image_id:string;
+  thumb_path:string;
+  full_path:string;
+}
+
 table Message {
   message_type:MessageType;
   command:Command;
   status:Status;
+  image_ready:ImageReady;
 }
 
 root_type Message;

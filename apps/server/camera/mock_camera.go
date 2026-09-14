@@ -26,8 +26,17 @@ func newMockCameraDevice() *mockCameraDevice {
 // GenerateFrame creates a synthetic preview frame
 func (m *mockCameraDevice) GenerateFrame() ([]byte, error) {
 	m.frameCount++
+	return m.encodeFrame(1920, 1080, "DEMO MODE", "Mock Camera", time.Now().Format("15:04:05"))
+}
 
-	width, height := 1920, 1080
+// GenerateCaptureStill creates a distinct still used after CaptureImage.
+func (m *mockCameraDevice) GenerateCaptureStill() ([]byte, error) {
+	m.frameCount++
+	stamp := time.Now().Format("15:04:05.000")
+	return m.encodeFrame(1280, 720, "CAPTURED", "Mock Still", stamp)
+}
+
+func (m *mockCameraDevice) encodeFrame(width, height int, line1, line2, line3 string) ([]byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	for y := 0; y < height; y++ {
@@ -39,9 +48,9 @@ func (m *mockCameraDevice) GenerateFrame() ([]byte, error) {
 		}
 	}
 
-	addLabel(img, width/2-300, height/2-50, "DEMO MODE")
-	addLabel(img, width/2-200, height/2+50, "Mock Camera")
-	addLabel(img, width/2-150, height/2+150, time.Now().Format("15:04:05"))
+	addLabel(img, width/2-300, height/2-50, line1)
+	addLabel(img, width/2-200, height/2+50, line2)
+	addLabel(img, width/2-150, height/2+150, line3)
 
 	buf := new(bytes.Buffer)
 	if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: 85}); err != nil {
@@ -268,19 +277,36 @@ func (m *MockCamera) CaptureImage() (*OperationResult, error) {
 		timing.Success = true
 	}
 
+	var cached *CachedCapture
+	if still, err := m.mockCam.GenerateCaptureStill(); err != nil {
+		log.Printf("Mock camera: failed to generate capture still: %v", err)
+	} else if c, err := StoreJPEGCapture(m.lastCapture, still); err != nil {
+		log.Printf("Mock camera: failed to cache capture still: %v", err)
+	} else {
+		cached = c
+	}
+
 	m.stateMachine.CompleteOperation()
 	if m.previewManager != nil {
 		m.previewManager.resumePreview()
 	}
 
-	log.Printf("Mock camera: Capture complete (mode=%s done=%s)", m.completionMode, timing.DoneAt)
+	log.Printf("Mock camera: Capture complete (mode=%s done=%s id=%v)", m.completionMode, timing.DoneAt, cachedID(cached))
 	return &OperationResult{
 		OperationID: opID,
 		Type:        OperationCapture,
 		Status:      OperationStatusSuccess,
 		Duration:    timing.DoneAt,
 		Timing:      timing,
+		Data:        cached,
 	}, nil
+}
+
+func cachedID(c *CachedCapture) string {
+	if c == nil {
+		return ""
+	}
+	return c.ID
 }
 
 // TriggerFocus simulates triggering autofocus

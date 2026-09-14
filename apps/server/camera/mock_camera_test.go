@@ -172,6 +172,16 @@ func TestMockCamera_CaptureImage(t *testing.T) {
 	if res == nil || res.Timing == nil {
 		t.Errorf("expected timing on capture result")
 	}
+	cached, ok := res.Data.(*CachedCapture)
+	if !ok || cached == nil {
+		t.Fatalf("expected CachedCapture in result.Data, got %T", res.Data)
+	}
+	if len(cached.FullJPEG) == 0 || len(cached.ThumbJPEG) == 0 {
+		t.Fatal("expected full and thumb JPEG bytes")
+	}
+	if mockManager.GetLastCapture() == nil || mockManager.GetLastCapture().ID != cached.ID {
+		t.Fatal("GetLastCapture should return the stored still")
+	}
 }
 
 func TestMockCamera_PauseResume(t *testing.T) {

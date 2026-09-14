@@ -18,6 +18,7 @@ type MockCameraLike struct {
 	connected         bool
 	clients           map[string]struct{}
 	latestFrame       *camera.Frame
+	lastCapture       *camera.CachedCapture
 	clientCount       int
 	addClientCalls    int
 	removeClientCalls int
@@ -50,8 +51,16 @@ func (m *MockCameraLike) GetLatestFrame() *camera.Frame {
 	return m.latestFrame
 }
 
+func (m *MockCameraLike) GetLastCapture() *camera.CachedCapture {
+	return m.lastCapture
+}
+
 func (m *MockCameraLike) SetLatestFrame(frame *camera.Frame) {
 	m.latestFrame = frame
+}
+
+func (m *MockCameraLike) SetLastCapture(c *camera.CachedCapture) {
+	m.lastCapture = c
 }
 
 func TestRunHTTPServer_MJPEG_NotConnected(t *testing.T) {
@@ -499,5 +508,106 @@ func TestRunHTTPServer_ConcurrentClients(t *testing.T) {
 	}
 	if mockCam.removeClientCalls != clientCount {
 		t.Errorf("Expected %d RemoveClient calls, got %d", clientCount, mockCam.removeClientCalls)
+	}
+}
+
+func TestParseCapturePath(t *testing.T) {
+	tests := []struct {
+		path       string
+		wantID     string
+		wantKind   string
+		wantOK     bool
+	}{
+		{"/captures/123/full.jpg", "123", "full", true},
+		{"/captures/123/thumb.jpg", "123", "thumb", true},
+		{"/captures/latest/full.jpg", "latest", "full", true},
+		{"/captures/abc", "", "", false},
+		{"/captures/abc/other.jpg", "", "", false},
+		{"/photo.jpg", "", "", false},
+	}
+	for _, tt := range tests {
+		id, kind, ok := parseCapturePath(tt.path)
+		if ok != tt.wantOK || id != tt.wantID || kind != tt.wantKind {
+			t.Errorf("parseCapturePath(%q) = (%q,%q,%v), want (%q,%q,%v)",
+				tt.path, id, kind, ok, tt.wantID, tt.wantKind, tt.wantOK)
+		}
+	}
+}
+
+func TestCapturesHTTPHandlers(t *testing.T) {
+	mockCam := NewMockCameraLike()
+	full := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10} // minimal JPEG-ish header
+	thumb := []byte{0xff, 0xd8, 0xff, 0xdb}
+	mockCam.SetLastCapture(&camera.CachedCapture{
+		ID:        "99",
+		FullJPEG:  full,
+		ThumbJPEG: thumb,
+	})
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/captures/", func(w http.ResponseWriter, r *http.Request) {
+		id, kind, ok := parseCapturePath(r.URL.Path)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		var cached *camera.CachedCapture
+		if id == "latest" {
+			cached = mockCam.GetLastCapture()
+		} else {
+			latest := mockCam.GetLastCapture()
+			if latest != nil && latest.ID == id {
+				cached = latest
+			}
+		}
+		if cached == nil {
+			http.Error(w, "Capture not found", http.StatusNotFound)
+			return
+		}
+		var data []byte
+		switch kind {
+		case "full":
+			data = cached.FullJPEG
+		case "thumb":
+			data = cached.ThumbJPEG
+		}
+		writeJPEG(w, data)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/captures/99/full.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("full status %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !bytes.Equal(body, full) {
+		t.Errorf("full body mismatch")
+	}
+
+	resp2, err := http.Get(server.URL + "/captures/latest/thumb.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("thumb status %d", resp2.StatusCode)
+	}
+	body2, _ := io.ReadAll(resp2.Body)
+	if !bytes.Equal(body2, thumb) {
+		t.Errorf("thumb body mismatch")
+	}
+
+	resp3, err := http.Get(server.URL + "/captures/nope/full.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for missing id, got %d", resp3.StatusCode)
 	}
 }

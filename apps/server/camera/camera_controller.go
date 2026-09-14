@@ -17,6 +17,9 @@ type CameraController interface {
 	AddClient(id string)
 	RemoveClient(id string)
 	GetLatestFrame() *Frame
+
+	// Last still cached after a successful CaptureImage (nil if none yet).
+	GetLastCapture() *CachedCapture
 }
 
 // SettingsController is optional: settings that touch camera hardware.

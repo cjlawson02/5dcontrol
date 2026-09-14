@@ -16,6 +16,12 @@ export function photoUrlForIp(ip: string): string {
   return `http://${ip}:8080/photo.jpg`;
 }
 
+/** Build an absolute media URL from a server HTTP path (e.g. /captures/id/full.jpg). */
+export function mediaUrlForIp(ip: string, path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `http://${ip}:8080${normalized}`;
+}
+
 export function cacheKeyForFilename(filename: string): string {
   return `gallery:${filename}`;
 }
@@ -61,19 +67,41 @@ export function listGalleryImages(): GalleryImage[] {
 }
 
 /**
- * Download the server snapshot (`/photo.jpg`) into the local gallery directory
+ * Download the live-view snapshot (`/photo.jpg`) into the local gallery directory
  * and seed expo-image's disk cache for fast thumbnail/full display.
  */
 export async function downloadLatestSnapshot(
   serverIp: string
 ): Promise<GalleryImage> {
-  const dir = ensureGalleryDirectory();
-  const createdAt = Date.now();
-  const filename = `capture-${createdAt}.jpg`;
-  const destination = new File(dir, filename);
-  const url = photoUrlForIp(serverIp);
+  return downloadJpegUrl(serverIp, photoUrlForIp(serverIp));
+}
 
-  logger.info(`Gallery: downloading snapshot from ${url}`);
+/**
+ * Download a capture still from an IMAGE_READY notify path into local gallery.
+ * Uses imageId when present so re-downloads of the same capture are idempotent.
+ */
+export async function downloadCaptureStill(
+  serverIp: string,
+  fullPath: string,
+  imageId?: string
+): Promise<GalleryImage> {
+  const url = mediaUrlForIp(serverIp, fullPath);
+  const createdAt =
+    imageId && /^\d+$/.test(imageId) ? Number(imageId) : Date.now();
+  const filename = `capture-${createdAt}.jpg`;
+  return downloadJpegUrl(serverIp, url, filename);
+}
+
+async function downloadJpegUrl(
+  serverIp: string,
+  url: string,
+  filename?: string
+): Promise<GalleryImage> {
+  const dir = ensureGalleryDirectory();
+  const resolvedName = filename ?? `capture-${Date.now()}.jpg`;
+  const destination = new File(dir, resolvedName);
+
+  logger.info(`Gallery: downloading from ${url} (ip=${serverIp})`);
   const downloaded = await File.downloadFileAsync(url, destination, {
     idempotent: true,
   });

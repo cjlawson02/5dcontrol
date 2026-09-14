@@ -6,8 +6,8 @@
 
 | Plane | Transport | Role |
 | --- | --- | --- |
-| Control | WebSocket `:8888/ws` | Commands + status (FlatBuffers); later: “image ready” notifies |
-| Media | HTTP `:8080` | MJPEG live view (`/live.mjpeg`), still JPEG/thumbnail downloads |
+| Control | WebSocket `:8888/ws` | Commands + status + `IMAGE_READY` notifies (FlatBuffers) |
+| Media | HTTP `:8080` | MJPEG live view (`/live.mjpeg`), preview snapshot (`/photo.jpg`), last-capture stills (`/captures/…`) |
 
 The **server** owns the USB camera session (libgphoto2). The **iOS client** never talks to the camera directly. MVP camera: **Canon EOS 5D Mark III**.
 
@@ -17,7 +17,7 @@ flowchart LR
     UI["Connection / UI"]
     WSCtx["WebSocketContext"]
     Stream["CameraStream (WebView + native zoom)"]
-    Gallery["Gallery (thin HTTP cache)"]
+    Gallery["Gallery + last-thumb"]
   end
 
   subgraph Appliance["Travel router"]
@@ -25,21 +25,24 @@ flowchart LR
       Hub["WS hub :8888"]
       HTTP["HTTP :8080"]
       Cam["CameraController"]
+      Store["Last-capture cache"]
       Real["RealCamera (gphoto2)"]
       Mock["MockCamera (-demo)"]
       MDNS["mDNS advertise"]
       Cam --> Real
       Cam --> Mock
+      Cam --> Store
     end
   end
 
   Camera["Canon 5D Mark III"]
 
-  WSCtx <-->|"FlatBuffers control + notifies"| Hub
+  WSCtx <-->|"FlatBuffers control + IMAGE_READY"| Hub
   Stream < -->|"MJPEG"| HTTP
-  Gallery < -->|"GET JPEG / thumbnail"| HTTP
+  Gallery < -->|"GET /captures/{id}/…"| HTTP
   Hub --> Cam
   HTTP --> Cam
+  HTTP --> Store
   Real <-->|"USB"| Camera
   MDNS -.->|"advertise; client browse TBD"| Phone
 ```
@@ -53,11 +56,13 @@ flowchart LR
 | **HTTP GET** (`expo-image` / `Image` with URL, optional `expo-file-system` cache) | Natural: same plane as MJPEG, streaming-friendly, easy zoom/cache |
 | **WS binary push** of full JPEG/RAW in FlatBuffers | Works but awkward: large messages, memory spikes, must write to disk or data-URI before display |
 
-Recommended M1 shape:
+**Shipped M1 shape:**
 
-1. Capture completes on server → cache JPEG on router.
-2. WS status/event: `{ imageId, thumbUrl, fullUrl }` (or equivalent FlatBuffers fields).
-3. App loads thumb/full via HTTP.
+1. Capture completes on server → cache JPEG (+ thumb) on the host/router.
+2. WS `IMAGE_READY`: `{ image_id, thumb_path, full_path }` (HTTP paths on `:8080`).
+3. App loads thumb/full via HTTP (`/captures/{id}/thumb.jpg`, `/captures/{id}/full.jpg`).
+
+`/photo.jpg` remains a **live-view preview snapshot**, not the last capture.
 
 ## 2. Goals & constraints
 
@@ -84,25 +89,27 @@ Recommended M1 shape:
 
 | Component | Responsibility |
 | --- | --- |
-| Expo Router screens | Connection gate → viewfinder → thin gallery → app settings |
-| `WebSocketContext` | Connect, persist IP, encode/decode FlatBuffers, surface status |
+| Expo Router screens | Connection gate → viewfinder → gallery → app settings |
+| `WebSocketContext` | Connect, persist IP, encode/decode FlatBuffers, surface status + `lastImageReady` |
 | `CameraStream` | MJPEG via WebView; pinch/pan via Gesture Handler + Reanimated overlay |
 | `ViewfinderGlass` | `expo-glass-effect` HUD chrome (status, nav, capture) |
+| Viewfinder last-thumb | After `IMAGE_READY`, download still and show strip → gallery |
+| Gallery | Auto-fetch on notify; manual fetch; local `expo-file-system` / `expo-image` cache |
 | `SettingsContext` | Local-only overlays (grid) |
 | Platform UI | Expo UI / SwiftUI forms for connection + app settings |
 
-**Not yet in product surface:** exposure UI, mDNS browse, capture-notify image pipeline. Thin gallery can pull HTTP `photo.jpg` into local cache — not auto-wired after shutter.
+**Not yet in product surface:** exposure UI, mDNS browse. Capture-notify is wired in demo and real code paths; verified under ~3s on travel-router Wi‑Fi with 5D III remains a live-bench exit criterion.
 
 ### 3.2 Server (`apps/server`)
 
 | Package | Responsibility |
 | --- | --- |
-| `server/` | HTTP MJPEG + WebSocket hub |
-| `camera/` | `CameraController`, operation serialization, preview lifecycle, settings helpers, mock |
-| `gphoto2/` | CGO bindings to libgphoto2 |
+| `server/` | HTTP MJPEG + capture routes + WebSocket hub (`IMAGE_READY` broadcast) |
+| `camera/` | `CameraController`, last-capture store, operation serialization, preview, settings helpers, mock |
+| `gphoto2/` | CGO bindings (capture path + file download) |
 | `discovery/` | mDNS registration (`_5dcontrol._tcp`) |
 
-Camera operations are serialized through a worker so preview and still/focus ops do not race on the USB session.
+Camera operations are serialized through a worker so preview and still/focus ops do not race on the USB session. After a successful capture, the server caches JPEG/thumb and notifies WS clients.
 
 ### 3.3 Protocol (`packages/proto`)
 
@@ -112,8 +119,9 @@ Current messages:
 
 - **Command:** `FOCUS`, `CAPTURE`, `QUERY_STATUS`
 - **Status:** `camera_connected`, `battery_level`
+- **ImageReady:** `image_id`, `thumb_path`, `full_path` (HTTP paths on `:8080`; client prepends `http://{ip}:8080`)
 
-Expansion for settings and images must land in `.fbs` first, then regenerate Go/TS, then wire WS handlers and UI.
+Expansion for settings must land in `.fbs` first, then regenerate Go/TS, then wire WS handlers and UI.
 
 ## 4. Key runtime flows
 
@@ -134,37 +142,45 @@ sequenceDiagram
   HTTP-->>App: MJPEG frames
 ```
 
-### 4.2 Capture / focus
+### 4.2 Capture → review
 
 ```mermaid
 sequenceDiagram
   participant App as Mobile app
   participant WS as Server WS
   participant Cam as Camera worker
+  participant Store as Last-capture cache
+  participant HTTP as HTTP :8080
   participant Preview as Preview loop
 
-  App->>WS: COMMAND FOCUS or CAPTURE
+  App->>WS: COMMAND CAPTURE
   WS->>Preview: Pause / coordinate
-  WS->>Cam: Blocking gphoto2 op
+  WS->>Cam: Blocking gphoto2 capture (+ download when possible)
+  Cam->>Store: Cache full JPEG + thumb
   Cam-->>WS: Complete
   WS->>Preview: Resume
-  WS-->>App: Status update (optional)
-  Note over App,Cam: Gap today: no image transfer. M1: WS notify + HTTP JPEG
+  WS-->>App: IMAGE_READY (id, thumb_path, full_path)
+  App->>HTTP: GET /captures/{id}/full.jpg
+  HTTP-->>App: JPEG bytes
+  App->>App: Gallery cache + viewfinder last-thumb
 ```
 
 Single-controller policy (Mode A): only one iOS client should drive commands; additional control connections are out of policy for v1.
 
 ### 4.3 Demo mode
 
-`go run . -demo` substitutes `MockCamera`: synthetic frames and fake battery/status so mobile UI can be developed without USB.
+`go run . -demo` substitutes `MockCamera`: synthetic MJPEG, fake battery/status, and a labeled “CAPTURED” still after shutter so the full notify → gallery path works without USB.
 
 ```mermaid
 flowchart TB
   Mobile["Mobile app"] --> WS["WS :8888"]
   Mobile --> MJPEG["HTTP :8080 /live.mjpeg"]
+  Mobile --> Stills["HTTP :8080 /captures/…"]
   WS --> Mock["MockCamera"]
   MJPEG --> Mock
-  Mock --> Frames["Synthetic frames + fake status"]
+  Stills --> Store["Last-capture cache"]
+  Mock --> Store
+  Mock --> Frames["Synthetic frames + fake status + capture stills"]
 ```
 
 ## 5. Cross-cutting concerns

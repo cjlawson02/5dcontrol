@@ -16,9 +16,10 @@ Agent-oriented working notes live in [`CLAUDE.md`](../CLAUDE.md) at the repo roo
 
 | Artifact | Status |
 | --- | --- |
-| Product README | Converted to accurate quick-start (root `README.md`) |
-| HLD / Roadmap / Product | Added under `docs/` |
-| Demo mode guide | Added (`DEMO_MODE.md`; previously linked but missing) |
+| Product README | Accurate quick-start (root `README.md`) |
+| HLD / Roadmap / Product | Under `docs/`; M1 capture→review sim path reflected |
+| Demo mode guide | `DEMO_MODE.md` (covers IMAGE_READY happy path) |
+| Development guide | Endpoints, protocol, capture→review pointers |
 | User manuals / supported-camera matrices | Not started |
 | API reference beyond FlatBuffers schema | Not started |
 | ADR (architecture decision records) | Not started; recommend adding when protocol expands |

@@ -48,6 +48,9 @@ type RealCamera struct {
 	completionMode CompletionMode
 	// eventWaitTimeout bounds WaitEvent draining after capture (modes B/hybrid).
 	eventWaitTimeout time.Duration
+
+	// lastCapture caches the most recent still for HTTP serve + WS notify.
+	lastCapture *CaptureStore
 }
 
 // Compile-time check to ensure RealCamera implements CameraController
@@ -69,7 +72,16 @@ func NewRealCamera() *RealCamera {
 		isConnected:      atomic.Bool{},
 		completionMode:   CompletionCommandReturn,
 		eventWaitTimeout: 5 * time.Second,
+		lastCapture:      NewCaptureStore(),
 	}
+}
+
+// GetLastCapture returns the most recent cached still, or nil.
+func (manager *RealCamera) GetLastCapture() *CachedCapture {
+	if manager == nil || manager.lastCapture == nil {
+		return nil
+	}
+	return manager.lastCapture.Latest()
 }
 
 // SetCompletionMode selects capture completion strategy (for benches / experiments).
@@ -257,6 +269,7 @@ func (manager *RealCamera) trySendCommand(cmd cameraCommand) (ok bool) {
 }
 
 // CaptureImage takes a still using the configured CompletionMode.
+// On success it downloads the file (when possible) into lastCapture for HTTP/WS.
 func (manager *RealCamera) CaptureImage() (*OperationResult, error) {
 	if manager.stateMachine == nil || !manager.isConnected.Load() {
 		return nil, ErrNotConnected
@@ -270,12 +283,16 @@ func (manager *RealCamera) CaptureImage() (*OperationResult, error) {
 	timing := &CaptureTiming{Mode: manager.completionMode}
 
 	var captureErr error
+	var path *gphoto2.CameraFilePath
 
 	// Phase 1: always run Capture() on the worker and record when it returns.
-	_, captureErr = manager.execOnWorker(func() (any, error) {
-		return nil, manager.camera.Capture(manager.ctx)
+	res, captureErr := manager.execOnWorker(func() (any, error) {
+		return manager.camera.Capture(manager.ctx)
 	})
 	timing.CommandReturnAt = time.Since(start)
+	if captureErr == nil {
+		path, _ = res.(*gphoto2.CameraFilePath)
+	}
 
 	if captureErr != nil {
 		timing.Success = false
@@ -300,6 +317,28 @@ func (manager *RealCamera) CaptureImage() (*OperationResult, error) {
 		manager.drainCaptureEvents(start, timing)
 	}
 
+	var cached *CachedCapture
+	if path != nil && path.Name != "" {
+		jpegBytes, dlErr := manager.downloadCaptureJPEG(path)
+		if dlErr != nil {
+			log.Printf("Capture download failed (%s/%s): %v — falling back to preview frame", path.Folder, path.Name, dlErr)
+			jpegBytes = manager.previewFrameCopy()
+		}
+		if len(jpegBytes) > 0 {
+			var storeErr error
+			cached, storeErr = StoreJPEGCapture(manager.lastCapture, jpegBytes)
+			if storeErr != nil {
+				log.Printf("Failed to cache capture JPEG: %v", storeErr)
+			}
+		}
+	} else if frame := manager.previewFrameCopy(); len(frame) > 0 {
+		var storeErr error
+		cached, storeErr = StoreJPEGCapture(manager.lastCapture, frame)
+		if storeErr != nil {
+			log.Printf("Failed to cache preview fallback JPEG: %v", storeErr)
+		}
+	}
+
 	timing.DoneAt = time.Since(start)
 	timing.Success = true
 	manager.finishOp(true)
@@ -310,7 +349,76 @@ func (manager *RealCamera) CaptureImage() (*OperationResult, error) {
 		Status:      OperationStatusSuccess,
 		Duration:    timing.DoneAt,
 		Timing:      timing,
+		Data:        cached,
 	}, nil
+}
+
+func (manager *RealCamera) previewFrameCopy() []byte {
+	frame := manager.GetLatestFrame()
+	if frame == nil || len(frame.Data) == 0 {
+		return nil
+	}
+	out := make([]byte, len(frame.Data))
+	copy(out, frame.Data)
+	return out
+}
+
+// downloadCaptureJPEG pulls the still from the camera card.
+// Prefers NORMAL for .jpg/.jpeg; for RAW-looking names tries PREVIEW first.
+func (manager *RealCamera) downloadCaptureJPEG(path *gphoto2.CameraFilePath) ([]byte, error) {
+	if path == nil {
+		return nil, fmt.Errorf("nil capture path")
+	}
+	nameLower := strings.ToLower(path.Name)
+	isJPEG := strings.HasSuffix(nameLower, ".jpg") || strings.HasSuffix(nameLower, ".jpeg")
+
+	tryTypes := []gphoto2.CameraFileType{gphoto2.FILE_TYPE_NORMAL}
+	if !isJPEG {
+		tryTypes = []gphoto2.CameraFileType{gphoto2.FILE_TYPE_PREVIEW, gphoto2.FILE_TYPE_NORMAL}
+	}
+
+	var lastErr error
+	for _, ft := range tryTypes {
+		data, err := manager.execOnWorker(func() (any, error) {
+			file, err := manager.camera.File()
+			if err != nil {
+				return nil, err
+			}
+			defer file.Close()
+			if err := manager.camera.FileGet(path.Folder, path.Name, ft, file, manager.ctx); err != nil {
+				return nil, err
+			}
+			bytes, _, err := file.GetDataAndSize()
+			if err != nil {
+				return nil, err
+			}
+			out := make([]byte, len(bytes))
+			copy(out, bytes)
+			return out, nil
+		})
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		jpegBytes, _ := data.([]byte)
+		if len(jpegBytes) == 0 {
+			lastErr = fmt.Errorf("empty file data")
+			continue
+		}
+		// Reject obvious non-JPEG if we can sniff SOI.
+		if len(jpegBytes) >= 2 && jpegBytes[0] == 0xff && jpegBytes[1] == 0xd8 {
+			return jpegBytes, nil
+		}
+		if isJPEG || ft == gphoto2.FILE_TYPE_PREVIEW {
+			// Some firmwares omit SOI in edge cases; still return if caller asked for JPEG/preview.
+			return jpegBytes, nil
+		}
+		lastErr = fmt.Errorf("downloaded data is not JPEG")
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no download attempts succeeded")
+	}
+	return nil, lastErr
 }
 
 func (manager *RealCamera) finishOp(success bool) {

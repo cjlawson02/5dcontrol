@@ -59,13 +59,29 @@ func (camera *Camera) CapturePreview(file *CameraFile, ctx *Context) error {
 	return nil
 }
 
-func (camera *Camera) Capture(ctx *Context) error {
+func (camera *Camera) Capture(ctx *Context) (*CameraFilePath, error) {
 	var path C.CameraFilePath
 
 	if r := C.gp_camera_capture(camera.c(), C.GP_CAPTURE_IMAGE, &path, ctx.c()); r < C.GP_OK {
-		return e(r)
+		return nil, e(r)
 	}
 
+	return &CameraFilePath{
+		Name:   C.GoString(&path.name[0]),
+		Folder: C.GoString(&path.folder[0]),
+	}, nil
+}
+
+// FileGet downloads a file from the camera into a CameraFile.
+func (camera *Camera) FileGet(folder, name string, fileType CameraFileType, file *CameraFile, ctx *Context) error {
+	cfolder := C.CString(folder)
+	defer C.free(unsafe.Pointer(cfolder))
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	if r := C.gp_camera_file_get(camera.c(), cfolder, cname, C.CameraFileType(fileType), file.c(), ctx.c()); r < C.GP_OK {
+		return e(r)
+	}
 	return nil
 }
 

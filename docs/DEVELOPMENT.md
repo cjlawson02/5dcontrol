@@ -42,6 +42,8 @@ Default endpoints (server host IP):
 | WebSocket control | `ws://<ip>:8888/ws` |
 | MJPEG live view | `http://<ip>:8080/live.mjpeg` |
 | Preview snapshot | `http://<ip>:8080/photo.jpg` |
+| Last capture (full) | `http://<ip>:8080/captures/{id}/full.jpg` (or `/captures/latest/full.jpg`) |
+| Last capture (thumb) | `http://<ip>:8080/captures/{id}/thumb.jpg` |
 
 Enter the server IPv4 on the mobile connection screen. mDNS is advertised by the server as `_5dcontrol._tcp` but the app does not browse it yet.
 
@@ -60,7 +62,7 @@ cd packages/proto
 npm run proto    # regenerates Go + TypeScript from control.fbs
 ```
 
-**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema only defines FOCUS / CAPTURE / QUERY_STATUS and basic status fields.
+**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema: FOCUS / CAPTURE / QUERY_STATUS, Status, and IMAGE_READY (capture notify with HTTP paths).
 
 ## Testing
 
@@ -84,20 +86,28 @@ Full design: [HLD.md](./HLD.md).
 
 | Area | Start here |
 | --- | --- |
-| WS hub | `apps/server/server/ws_server.go` |
-| MJPEG | `apps/server/server/http_server.go` |
-| Real / mock camera | `apps/server/camera/` |
+| WS hub + `IMAGE_READY` | `apps/server/server/ws_server.go` |
+| MJPEG + `/captures/…` | `apps/server/server/http_server.go` |
+| Real / mock camera + last-capture store | `apps/server/camera/` |
 | GPhoto2 bindings | `apps/server/gphoto2/` |
-| Client WS | `apps/mobile/components/WebSocketContext.tsx` |
-| Viewfinder | `apps/mobile/app/(tabs)/index.tsx` |
+| Client WS + `lastImageReady` | `apps/mobile/components/WebSocketContext.tsx` |
+| Viewfinder + last-thumb | `apps/mobile/app/(tabs)/index.tsx` |
 | Live zoom | `apps/mobile/components/CameraStream.tsx` |
 | Glass HUD | `apps/mobile/components/ViewfinderGlass.tsx` |
-| Thin gallery | `apps/mobile/app/gallery.tsx` |
+| Gallery review | `apps/mobile/app/gallery.tsx` |
 
 ### Camera operations note
 
-Capture and many focus paths are **synchronous/blocking** in libgphoto2. The server serializes USB work and coordinates preview pause/resume around ops. Prefer that model over inventing async completion events the camera does not reliably emit.
+Capture and many focus paths are **synchronous/blocking** in libgphoto2. The server serializes USB work and coordinates preview pause/resume around ops. Prefer that model over inventing async completion events the camera does not reliably emit. After capture, JPEG/thumb land in the last-capture store and clients are notified via `IMAGE_READY` (HTTP for bytes).
+
+### Capture → review (happy path)
+
+1. Client sends `CAPTURE` over WS.
+2. Server captures, caches still, broadcasts `IMAGE_READY` with HTTP paths.
+3. Client GETs `/captures/{id}/full.jpg` (gallery + viewfinder last-thumb).
+
+`/photo.jpg` is only a live-view snapshot fallback for manual “Fetch latest” when no capture notify is available.
 
 ### Wiring new status consumers (mobile)
 
-When protocol grows, register handlers via WebSocket context setters (pattern already used for connection/status). Prefer extending FlatBuffers + context rather than ad-hoc JSON.
+When protocol grows, register handlers via WebSocket context setters (pattern already used for connection/status/`lastImageReady`). Prefer extending FlatBuffers + context rather than ad-hoc JSON.

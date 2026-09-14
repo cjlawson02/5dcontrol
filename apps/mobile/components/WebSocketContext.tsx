@@ -1,4 +1,9 @@
-import { Command, ControlType, Message, MessageType } from "@5dcontrol/proto";
+import {
+  Command,
+  ControlType,
+  Message,
+  MessageType,
+} from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Builder, ByteBuffer } from "flatbuffers";
 import React, {
@@ -13,16 +18,26 @@ import { logger } from "../utils/logger";
 
 type ConnectionStatus = "connected" | "disconnected" | "loading";
 
+/** Paths are HTTP paths on :8080; prepend http://{ip}:8080 on the client. */
+export type ImageReadyInfo = {
+  imageId: string;
+  thumbPath: string;
+  fullPath: string;
+  receivedAt: number;
+};
+
 interface WebSocketContextValue {
   status: ConnectionStatus;
   cameraStatus: ConnectionStatus;
   batteryLevel: number;
   ip: string | null;
+  lastImageReady: ImageReadyInfo | null;
   setIp: (ip: string | null) => void;
   reconnect: () => void;
   connect: (ip: string) => Promise<void>;
   sendCommand: (type: ControlType) => void;
   loadIp?: () => Promise<void>;
+  clearLastImageReady: () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | undefined>(
@@ -54,11 +69,18 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const [batteryLevel, setBatteryLevel] = useState<number>(0);
   const [ip, setInternalIp] = useState<string | null>(null);
   const [connectionTrigger, setConnectionTrigger] = useState(0);
+  const [lastImageReady, setLastImageReady] = useState<ImageReadyInfo | null>(
+    null
+  );
 
   const setConnected = useCallback(() => setStatus("connected"), []);
   const setDisconnected = useCallback(() => setStatus("disconnected"), []);
 
   const wsRef = useRef<WebSocket | null>(null);
+
+  const clearLastImageReady = useCallback(() => {
+    setLastImageReady(null);
+  }, []);
 
   const setIp = useCallback(async (newIp: string | null) => {
     logger.debug(`WebSocket: setIp called with: ${newIp}`);
@@ -78,19 +100,16 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     setConnectionTrigger((prev) => prev + 1);
   }, []);
 
-  const connect = useCallback(
-    async (targetIp: string) => {
-      logger.debug(`WebSocket: connect called with: ${targetIp}`);
-      setInternalIp(targetIp);
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, targetIp);
-      } catch (error) {
-        logger.error(`WebSocket: Error saving IP to storage:`, error);
-      }
-      setConnectionTrigger((prev) => prev + 1);
-    },
-    []
-  );
+  const connect = useCallback(async (targetIp: string) => {
+    logger.debug(`WebSocket: connect called with: ${targetIp}`);
+    setInternalIp(targetIp);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, targetIp);
+    } catch (error) {
+      logger.error(`WebSocket: Error saving IP to storage:`, error);
+    }
+    setConnectionTrigger((prev) => prev + 1);
+  }, []);
 
   const loadIp = useCallback(async () => {
     logger.debug(`WebSocket: Loading IP from storage`);
@@ -191,7 +210,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
       const msg = Message.getRootAsMessage(new ByteBuffer(data));
       const msgType = msg.messageType();
       logger.debug(
-        `WebSocket: Message type: ${msgType} (STATUS=${MessageType.STATUS}, COMMAND=${MessageType.COMMAND})`
+        `WebSocket: Message type: ${msgType} (STATUS=${MessageType.STATUS}, IMAGE_READY=${MessageType.IMAGE_READY})`
       );
 
       if (msgType === MessageType.STATUS) {
@@ -213,8 +232,28 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             `WebSocket: Received STATUS message but status object is null`
           );
         }
+      } else if (msgType === MessageType.IMAGE_READY) {
+        const ready = msg.imageReady();
+        if (!ready) {
+          logger.warn(`WebSocket: IMAGE_READY missing payload`);
+          return;
+        }
+        const imageId = ready.imageId() ?? "";
+        const thumbPath = ready.thumbPath() ?? "";
+        const fullPath = ready.fullPath() ?? "";
+        if (!imageId || !fullPath) {
+          logger.warn(`WebSocket: IMAGE_READY missing id/path`);
+          return;
+        }
+        logger.info(`WebSocket: Image ready id=${imageId} full=${fullPath}`);
+        setLastImageReady({
+          imageId,
+          thumbPath,
+          fullPath,
+          receivedAt: Date.now(),
+        });
       } else {
-        logger.warn(`WebSocket: Received non-STATUS message, type: ${msgType}`);
+        logger.warn(`WebSocket: Received unhandled message type: ${msgType}`);
       }
     };
 
@@ -238,11 +277,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     cameraStatus,
     batteryLevel,
     ip,
+    lastImageReady,
     setIp,
     reconnect,
     connect,
     sendCommand,
     loadIp,
+    clearLastImageReady,
   };
 
   return (

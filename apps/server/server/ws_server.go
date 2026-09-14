@@ -68,12 +68,10 @@ var hub *clientHub
 
 // buildStatusMessage creates a status message for the given camera
 func buildStatusMessage(cam camera.CameraController) []byte {
-	builder := flatbuffers.NewBuilder(1024) // Increased buffer size for more data
+	builder := flatbuffers.NewBuilder(1024)
 
-	// Get real battery level from camera
 	batteryLevel := cam.GetBatteryLevel()
 
-	// Build status message
 	Proto.StatusStart(builder)
 	Proto.StatusAddCameraConnected(builder, cam.IsConnected())
 	Proto.StatusAddBatteryLevel(builder, batteryLevel)
@@ -82,6 +80,29 @@ func buildStatusMessage(cam camera.CameraController) []byte {
 	Proto.MessageStart(builder)
 	Proto.MessageAddMessageType(builder, Proto.MessageTypeSTATUS)
 	Proto.MessageAddStatus(builder, status)
+	msg := Proto.MessageEnd(builder)
+
+	builder.Finish(msg)
+	return builder.FinishedBytes()
+}
+
+// buildImageReadyMessage creates an IMAGE_READY notify for a cached capture.
+func buildImageReadyMessage(c *camera.CachedCapture) []byte {
+	builder := flatbuffers.NewBuilder(256)
+
+	idOff := builder.CreateString(c.ID)
+	thumbOff := builder.CreateString(c.ThumbPath())
+	fullOff := builder.CreateString(c.FullPath())
+
+	Proto.ImageReadyStart(builder)
+	Proto.ImageReadyAddImageId(builder, idOff)
+	Proto.ImageReadyAddThumbPath(builder, thumbOff)
+	Proto.ImageReadyAddFullPath(builder, fullOff)
+	imageReady := Proto.ImageReadyEnd(builder)
+
+	Proto.MessageStart(builder)
+	Proto.MessageAddMessageType(builder, Proto.MessageTypeIMAGE_READY)
+	Proto.MessageAddImageReady(builder, imageReady)
 	msg := Proto.MessageEnd(builder)
 
 	builder.Finish(msg)
@@ -102,6 +123,14 @@ func broadcastStatus(cam camera.CameraController) {
 		message := buildStatusMessage(cam)
 		hub.broadcast <- message
 	}
+}
+
+// broadcastImageReady notifies all clients that a new still is available over HTTP.
+func broadcastImageReady(c *camera.CachedCapture) {
+	if hub == nil || c == nil {
+		return
+	}
+	hub.broadcast <- buildImageReadyMessage(c)
 }
 
 // RunWebSocketServer starts the WebSocket handler for camera control.
@@ -160,19 +189,35 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 						}
 					case Proto.ControlTypeCAPTURE:
 						log.Println("Capture command received")
-						if _, err := cam.CaptureImage(); err != nil {
+						res, err := cam.CaptureImage()
+						if err != nil {
 							log.Printf("Failed to capture image: %v", err)
+							break
+						}
+						var cached *camera.CachedCapture
+						if res != nil {
+							if c, ok := res.Data.(*camera.CachedCapture); ok {
+								cached = c
+							}
+						}
+						if cached == nil {
+							cached = cam.GetLastCapture()
+						}
+						if cached != nil {
+							broadcastImageReady(cached)
+						} else {
+							log.Println("Capture succeeded but no cached JPEG available to notify")
 						}
 					case Proto.ControlTypeQUERY_STATUS:
 						log.Println("Status query received")
-						// Send status back
 						sendStatus(conn, cam)
 					}
 				}
 
 			case Proto.MessageTypeSTATUS:
-				// Usually client wouldn't send this, but log it if needed
 				log.Println("Unexpected STATUS message from client")
+			case Proto.MessageTypeIMAGE_READY:
+				log.Println("Unexpected IMAGE_READY message from client")
 			}
 
 		}

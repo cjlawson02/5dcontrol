@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -16,6 +16,7 @@ import {
 import { PageLayout } from "../components/PageLayout";
 import { useWebSocketContext } from "../components/WebSocketContext";
 import {
+  downloadCaptureStill,
   downloadLatestSnapshot,
   GalleryImage,
   listGalleryImages,
@@ -31,12 +32,13 @@ const imageSize =
   (screenWidth - GRID_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
 
 export default function GalleryScreen() {
-  const { ip } = useWebSocketContext();
+  const { ip, lastImageReady } = useWebSocketContext();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<GalleryImage | null>(null);
+  const handledReadyAt = useRef<number | null>(null);
 
   const refreshLocal = useCallback(async () => {
     try {
@@ -64,6 +66,46 @@ export default function GalleryScreen() {
     };
   }, [refreshLocal]);
 
+  // Auto-pull when the server notifies that a capture is ready.
+  useEffect(() => {
+    if (!ip || !lastImageReady) {
+      return;
+    }
+    if (handledReadyAt.current === lastImageReady.receivedAt) {
+      return;
+    }
+    handledReadyAt.current = lastImageReady.receivedAt;
+
+    let cancelled = false;
+    (async () => {
+      setFetching(true);
+      setError(null);
+      try {
+        await downloadCaptureStill(
+          ip,
+          lastImageReady.fullPath,
+          lastImageReady.imageId
+        );
+        if (!cancelled) {
+          await refreshLocal();
+        }
+      } catch (err) {
+        logger.error("Gallery: capture download failed", err);
+        if (!cancelled) {
+          setError("Could not download capture — is the server reachable?");
+        }
+      } finally {
+        if (!cancelled) {
+          setFetching(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ip, lastImageReady, refreshLocal]);
+
   const handleFetchLatest = async () => {
     if (!ip) {
       setError("No server IP — connect first");
@@ -72,12 +114,20 @@ export default function GalleryScreen() {
     setFetching(true);
     setError(null);
     try {
-      await downloadLatestSnapshot(ip);
+      if (lastImageReady?.fullPath) {
+        await downloadCaptureStill(
+          ip,
+          lastImageReady.fullPath,
+          lastImageReady.imageId
+        );
+      } else {
+        await downloadLatestSnapshot(ip);
+      }
       await refreshLocal();
     } catch (err) {
       logger.error("Gallery: snapshot download failed", err);
       setError(
-        "Could not download photo.jpg — is the camera preview streaming?"
+        "Could not download image — capture a frame or start live preview first."
       );
     } finally {
       setFetching(false);
@@ -144,8 +194,8 @@ export default function GalleryScreen() {
           <Feather name="image" color="#666" size={64} />
           <Text style={styles.emptyTitle}>No images yet</Text>
           <Text style={styles.muted}>
-            Fetch the live snapshot from the server to start a local gallery.
-            Full capture transfer over the wire is still on the roadmap.
+            Capture from the viewfinder to pull the still automatically, or
+            fetch the latest capture / live snapshot.
           </Text>
         </View>
       ) : (

@@ -9,7 +9,8 @@ See [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 - Manual IP connect, live MJPEG preview, focus + capture commands
 - Camera connected / battery status
 - Local grid overlays (rule of thirds, golden ratio)
-- Thin gallery: download latest `photo.jpg` into on-device cache
+- Capture → review: WS `IMAGE_READY` + HTTP `/captures/{id}/…` (demo + real download path)
+- Gallery auto-fetch + viewfinder last-capture thumb
 - Demo mode with a mock camera (no hardware)
 
 ## Quick start
@@ -34,6 +35,8 @@ Details: [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 | --- | --- |
 | Control WebSocket | `ws://<ip>:8888/ws` |
 | Live view | `http://<ip>:8080/live.mjpeg` |
+| Last capture | `http://<ip>:8080/captures/latest/full.jpg` |
+| Preview snapshot | `http://<ip>:8080/photo.jpg` |
 
 ## Documentation
 

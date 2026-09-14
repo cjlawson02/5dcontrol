@@ -96,7 +96,7 @@ func TestCamera_Capture_ErrorHandling(t *testing.T) {
 	}
 	defer ctx.Close()
 
-	err = camera.Capture(ctx)
+	_, err = camera.Capture(ctx)
 	if err != nil {
 		// Expected in test environments without camera
 		t.Logf("Capture failed as expected in test environment: %v", err)
@@ -271,7 +271,7 @@ func TestCamera_Integration_WithContext(t *testing.T) {
 	}
 
 	// Try to capture image
-	err = camera.Capture(ctx)
+	_, err = camera.Capture(ctx)
 	if err != nil {
 		t.Logf("Integration test: Capture failed: %v", err)
 		return
@@ -426,7 +426,7 @@ func TestCamera_ErrorRecovery(t *testing.T) {
 			defer file.Close()
 			return camera.CapturePreview(file, ctx)
 		},
-		func() error { return camera.Capture(ctx) },
+		func() error { _, err := camera.Capture(ctx); return err },
 		func() error { return camera.Exit(ctx) },
 	}
 

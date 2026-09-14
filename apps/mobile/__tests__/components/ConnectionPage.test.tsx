@@ -13,6 +13,8 @@ jest.mock("@react-native-async-storage/async-storage", () => mockAsyncStorage);
 
 // Mock the WebSocket context
 const mockWebSocketContext = {
+  lastImageReady: null,
+  clearLastImageReady: jest.fn(),
   status: "disconnected",
   cameraStatus: "disconnected",
   ip: "192.168.1.1",

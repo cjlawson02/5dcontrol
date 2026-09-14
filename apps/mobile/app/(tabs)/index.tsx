@@ -1,8 +1,9 @@
 import { ControlType } from "@5dcontrol/proto";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -19,6 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraStream } from "../../components/CameraStream";
+import { FocusIndicator } from "../../components/FocusIndicator";
 import { GridOverlay } from "../../components/GridOverlay";
 import {
   ViewfinderGlass,
@@ -26,20 +28,72 @@ import {
 } from "../../components/ViewfinderGlass";
 import { useWebSocketContext } from "../../components/WebSocketContext";
 import { useSettings } from "../../contexts/SettingsContext";
+import {
+  downloadCaptureStill,
+  GalleryImage,
+  mediaUrlForIp,
+} from "../../utils/galleryCache";
 import { logger } from "../../utils/logger";
 
 export default function HomeScreen() {
   const [focusActive, setFocusActive] = useState(false);
+  const [lastThumb, setLastThumb] = useState<GalleryImage | null>(null);
   const frameTimes = useRef<number[]>([]);
   const flashOpacity = useSharedValue(0);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { cameraStatus, ip, sendCommand, status, batteryLevel } =
-    useWebSocketContext();
+  const handledReadyAt = useRef<number | null>(null);
+  const {
+    cameraStatus,
+    ip,
+    sendCommand,
+    status,
+    batteryLevel,
+    lastImageReady,
+  } = useWebSocketContext();
   const { state: settings } = useSettings();
 
   const flashStyle = useAnimatedStyle(() => ({
     opacity: flashOpacity.value,
   }));
+
+  useEffect(() => {
+    if (!ip || !lastImageReady) {
+      return;
+    }
+    if (handledReadyAt.current === lastImageReady.receivedAt) {
+      return;
+    }
+    handledReadyAt.current = lastImageReady.receivedAt;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const image = await downloadCaptureStill(
+          ip,
+          lastImageReady.fullPath,
+          lastImageReady.imageId
+        );
+        if (!cancelled) {
+          setLastThumb(image);
+        }
+      } catch (err) {
+        logger.warn("Viewfinder: failed to cache capture after notify", err);
+        if (!cancelled && lastImageReady.thumbPath) {
+          setLastThumb({
+            id: lastImageReady.imageId,
+            filename: `capture-${lastImageReady.imageId}.jpg`,
+            uri: mediaUrlForIp(ip, lastImageReady.thumbPath),
+            cacheKey: `remote:${lastImageReady.imageId}`,
+            createdAt: Number(lastImageReady.imageId) || Date.now(),
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ip, lastImageReady]);
 
   const notifyCaptureSuccess = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -60,7 +114,6 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     sendCommand(ControlType.CAPTURE);
 
-    // Separate non-glass overlay — never fade GlassView via parent opacity
     flashOpacity.value = withSequence(
       withTiming(1, { duration: 100 }),
       withTiming(0, { duration: 200 }, (finished) => {
@@ -95,6 +148,11 @@ export default function HomeScreen() {
   const openSettings = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push("/settings");
+  };
+
+  const openGallery = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/gallery");
   };
 
   const handleFrame = () => {
@@ -156,13 +214,8 @@ export default function HomeScreen() {
             onFrame={handleFrame}
           />
           <GridOverlay type={settings.gridType} visible={true} />
-          {focusActive && (
-            <View style={styles.focusIndicator}>
-              <View style={styles.focusBox} />
-            </View>
-          )}
+          {focusActive ? <FocusIndicator x={0} y={0} centered /> : null}
 
-          {/* Non-glass full-screen flash layer (Reanimated) */}
           <Animated.View
             pointerEvents="none"
             style={[styles.captureFlash, flashStyle]}
@@ -184,6 +237,22 @@ export default function HomeScreen() {
                     : "Offline"}
               </Text>
             </ViewfinderGlass>
+
+            {lastThumb ? (
+              <Pressable
+                onPress={openGallery}
+                accessibilityRole="button"
+                accessibilityLabel="Last capture"
+                testID="last-capture-thumb"
+                style={styles.lastThumbWrap}
+              >
+                <Image
+                  source={{ uri: lastThumb.uri, cacheKey: lastThumb.cacheKey }}
+                  style={styles.lastThumb}
+                  contentFit="cover"
+                />
+              </Pressable>
+            ) : null}
           </View>
 
           <ViewfinderGlassContainer style={styles.rightNav} spacing={16}>
@@ -236,10 +305,7 @@ export default function HomeScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/gallery");
-              }}
+              onPress={openGallery}
               accessibilityRole="button"
               accessibilityLabel="Gallery"
               testID="gallery-button"
@@ -269,20 +335,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     zIndex: 100,
   },
-  focusIndicator: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 50,
-    pointerEvents: "none",
-  },
-  focusBox: {
-    width: 70,
-    height: 70,
-    borderWidth: 5,
-    borderColor: "#fff",
-    backgroundColor: "transparent",
-  },
   leftNav: {
     position: "absolute",
     top: 0,
@@ -291,6 +343,20 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     zIndex: 10,
     alignItems: "center",
+    gap: 16,
+  },
+  lastThumbWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.85)",
+    backgroundColor: "#1a1a1a",
+  },
+  lastThumb: {
+    width: "100%",
+    height: "100%",
   },
   rightNav: {
     position: "absolute",

@@ -5,7 +5,7 @@
 5DControl is a **CamRanger-like camera remote appliance** built from:
 
 - A **travel router with USB** plugged into the camera (hosts the Go server + Wi‑Fi AP)
-- An **iOS Expo app** for live view, focus, capture, and (planned) review/settings
+- An **iOS Expo app** for live view, focus, capture, review, and (planned) remote exposure settings
 - A thin **FlatBuffers** control protocol over WebSocket, plus **HTTP** for MJPEG live view and still downloads
 
 The photographer joins the router’s network and controls a **Canon EOS 5D Mark III**. This is a personal project; store distribution and desktop clients are deferred.
@@ -45,7 +45,7 @@ flowchart TB
 4. Adjust exposure settings remotely without walking back to the camera.
 5. Support advanced sequences (bracketing, intervalometer, focus stacking) for studio/macro/landscape workflows.
 
-Today we reliably deliver **(1)** and a partial **(2–3)** (live view + focus/capture, plus a thin manual HTTP gallery — not capture-notify review). **(4–5)** are not productized yet.
+Today we reliably deliver **(1)** and **(2)** (live view + focus/capture). **(3)** is productized on the demo/sim path (WS `IMAGE_READY` → HTTP still → gallery/last-thumb); live 5D III timing on travel-router Wi‑Fi still needs bench validation. **(4–5)** are not productized yet.
 
 ```mermaid
 flowchart LR
@@ -55,13 +55,13 @@ flowchart LR
   J4 --> J5["5. Advanced sequences"]
 
   style J1 fill:#2d6a4f,color:#fff
-  style J2 fill:#95d5b2,color:#111
+  style J2 fill:#2d6a4f,color:#fff
   style J3 fill:#95d5b2,color:#111
   style J4 fill:#adb5bd,color:#111
   style J5 fill:#adb5bd,color:#111
 ```
 
-Green = done / partial · Gray = not productized.
+Green = done · Light green = partial (sim done / live bench open) · Gray = not productized.
 
 ## Competitive reference: CamRanger-class parity
 
@@ -73,8 +73,8 @@ Targets use CamRanger 2 as the professional baseline. Status is relative to **5D
 | Remote capture | Yes | Yes | Maintain |
 | Focus (touch / incremental) | Touch + incremental | Center AF trigger only | P0 |
 | Camera settings remote (ISO/Tv/Av/WB/…) | Broad | Server helpers only; not on wire/UI | P0 |
-| Post-capture image review + zoom | Full-res up to 200% | Thin HTTP gallery + local cache (not capture-notify yet) | P0 |
-| Auto thumbnails after capture | Yes | Not started | P0 |
+| Post-capture image review + zoom | Full-res up to 200% | Gallery + fullscreen review via HTTP stills after `IMAGE_READY` | P0 |
+| Auto thumbnails after capture | Yes | Yes (viewfinder last-thumb + gallery auto-fetch; live timing bench open) | P0 |
 | Grid / composition overlays | Many | Rule-of-thirds + golden ratio | P1 |
 | Histogram / blinkies / EXIF overlay | Yes | Not started | P1 |
 | Client discovery | Own Wi‑Fi AP | Server mDNS only; manual IP in app | P0 |
@@ -108,8 +108,8 @@ Targets use CamRanger 2 as the professional baseline. Status is relative to **5D
 
 | Metric | Target once MVP ships |
 | --- | --- |
-| Time from open app → live view | &lt; 15 s on the router Wi‑Fi with discovery |
-| Capture → thumbnail visible | &lt; 3 s typical JPEG on 5D Mark III |
+| Time from open app → live view | < 15 s on the router Wi‑Fi with discovery |
+| Capture → thumbnail visible | < 3 s typical JPEG on 5D Mark III |
 | Live view usable latency | Subjectively “shootable”; measure p95 frame age |
-| Focus success rate (5D III) | &gt; 95% of presses produce AF attempt without killing preview |
+| Focus success rate (5D III) | > 95% of presses produce AF attempt without killing preview |
 | Demo mode | Full happy-path without hardware for CI and onboarding |

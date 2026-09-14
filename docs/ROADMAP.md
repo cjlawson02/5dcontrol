@@ -7,20 +7,22 @@ This roadmap combines **what git history shows we already shipped** with **what 
 ```mermaid
 timeline
   title 5DControl shipped history (git main)
-  section 2025-06
-    Scaffold : Expo app initial commit
-  section 2025-07
-    Foundation : Monorepo mobile + Go + proto
-               : Capture, connection page, mDNS name, camera status
-  section 2025-10
-    Usability : Demo mode, grid overlays, settings page
-              : Focus simplified for GPhoto2 limits
-              : WS hardening, GPhoto2 interface, unit tests, logging
-              : Real/mock camera split, CLAUDE.md
-  section 2026-09
-    Stabilization : Camera op serialization + capture completion bench
-                  : Expo SDK 57 + Expo UI (remove RNEUI)
-                  : Glass HUD, native zoom, thin HTTP gallery cache
+    section 2025-06
+      Scaffold : Expo app initial commit
+    section 2025-07
+      Foundation : Monorepo mobile + Go + proto
+                 : Capture, connection page, mDNS name, camera status
+    section 2025-10
+      Usability : Demo mode, grid overlays, settings page
+                : Focus simplified for GPhoto2 limits
+                : WS hardening, GPhoto2 interface, unit tests, logging
+                : Real/mock camera split, CLAUDE.md
+    section 2026-09
+      Stabilization : Camera op serialization + capture completion bench
+                    : Expo SDK 57 + Expo UI (remove RNEUI)
+                    : Glass HUD, native zoom, thin HTTP gallery cache
+      M1 capture loop : IMAGE_READY + /captures HTTP + gallery/thumb wiring
+                      : Mock stills; real gphoto2 download path (bench TBD)
 ```
 
 ### Shipped capability themes (evidence-based)
@@ -30,17 +32,18 @@ timeline
 | 2025-06 → 07 | Foundation | monorepo, capture, connection, status, mDNS naming |
 | 2025-10 | Usability + reliability | demo mode, grids, settings, focus/GPhoto2 hardening, tests, logging |
 | 2026-09 | Stabilization + Expo 57 polish | serialize camera ops, Expo UI, glass HUD, native zoom, thin gallery |
+| 2026-09 | M1 capture→review (sim path) | `IMAGE_READY`, last-capture cache, `/captures/…`, gallery + last-thumb |
 
 ### Explicitly not shipped (code + docs evidence)
 
-- Full capture→review loop (WS image-ready notify + reliable last-capture pull from card)
+- Verified under ~3s capture→thumb on travel-router Wi‑Fi with 5D Mark III card download (sim/demo path is wired; live bench remains)
 - End-to-end camera exposure settings (ISO/Tv/Av) over WebSocket + UI
 - Mobile mDNS/Bonjour discovery (server advertises only)
 - Auth/TLS
 - Android checked-in native project / CI workflows
 - Advanced sequences: HDR, intervalometer, focus stacking, video
 
-**Partial:** iOS gallery can fetch `photo.jpg` over HTTP into local `expo-file-system` / `expo-image` cache — Phase 1 still owns the real post-capture notify path.
+**Shipped (M1 sim path):** WS `IMAGE_READY` after capture; HTTP thumb/full under `/captures/…`; mock still generation; iOS gallery + viewfinder last-thumb auto-pull; real-mode gphoto2 download with preview-frame fallback.
 
 ---
 
@@ -48,7 +51,7 @@ timeline
 
 Priorities map to [PRODUCT.md](./PRODUCT.md) P0–P3.
 
-### Phase 0 — Docs & truthfulness *(this change)*
+### Phase 0 — Docs & truthfulness *(done)*
 
 - Accurate README, HLD, roadmap, demo guide
 - Treat `control.fbs` as protocol source of truth; call out generated `dist/` drift
@@ -58,12 +61,13 @@ Priorities map to [PRODUCT.md](./PRODUCT.md) P0–P3.
 
 **Goal:** After pressing shutter, the photographer can review the frame on iOS.
 
-1. Extend protocol with image-ready notify (id + HTTP URLs); serve thumb + full JPEG over HTTP
-2. Server: download/cache last capture from 5D Mark III card (or host cache on the router)
-3. Mobile: wire the existing gallery route to capture-notify; thumbnail strip after capture; pinch-zoom review (`expo-image` / file cache already partial)
-4. Wire or remove orphan UI (`CaptureButton`, `FocusIndicator`, etc.)
-
-**Exit criteria:** Capture → thumbnail &lt; ~3s (JPEG) on 5D Mark III over the travel-router Wi‑Fi.
+| Item | Status |
+| --- | --- |
+| 1. Protocol `IMAGE_READY` + HTTP thumb/full paths | **Done** (sim + real code) |
+| 2. Server last-capture cache; mock stills; gphoto2 download path | **Done** (live card timing unverified) |
+| 3. Mobile gallery auto-fetch + viewfinder last-thumb | **Done** |
+| 4. Orphan UI: remove `CaptureButton` / `TopStatusBar`; wire `FocusIndicator` | **Done** |
+| Exit: capture → thumb ≲3s JPEG on 5D III over travel-router Wi‑Fi | **Open — needs live bench** |
 
 ### Phase 2 — Remote exposure + discovery (P0)
 
@@ -77,7 +81,7 @@ Priorities map to [PRODUCT.md](./PRODUCT.md) P0–P3.
 
 ### Phase 3 — Focus & composition quality (P0/P1)
 
-1. Tap-to-focus (reuse unused focus indicator positioning)
+1. Tap-to-focus (positioned `FocusIndicator` already available)
 2. Incremental focus if supported by body
 3. Live-view overlays: histogram / highlight warning (beyond grids)
 4. Preview zoom quality pass (already partial)
@@ -109,20 +113,20 @@ Order TBD by persona (still Canon 5D III only):
 
 ---
 
-## Near-term suggested sequence (next 3 milestones)
+## Near-term suggested sequence (next milestones)
 
 ```mermaid
 flowchart LR
-  M1["M1: Gallery + last capture"] --> M2["M2: Settings over wire"]
+  M1["M1: Gallery + last capture<br/>(sim done; bench open)"] --> M2["M2: Settings over wire"]
   M2 --> M3["M3: mDNS + tap-to-focus"]
   M3 --> Later["Phase 5+: HDR / intervalometer / stacking / video"]
 ```
 
-| Milestone | Outcome |
-| --- | --- |
-| M1 | HTTP JPEG serve + WS notify; iOS gallery MVP on 5D III |
-| M2 | Settings over the wire + viewfinder controls |
-| M3 | mDNS connect on router Wi‑Fi + tap-to-focus |
+| Milestone | Outcome | Status |
+| --- | --- | --- |
+| M1 | HTTP JPEG serve + WS notify; iOS gallery MVP | **Sim/demo done**; 5D III timing bench open |
+| M2 | Settings over the wire + viewfinder controls | Next |
+| M3 | mDNS connect on router Wi‑Fi + tap-to-focus | After M2 |
 
 Everything in Phase 5+ waits until M1–M3 feel trustworthy on the travel-router + 5D Mark III setup.
 
