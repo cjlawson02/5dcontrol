@@ -1,17 +1,15 @@
-import { Button } from "@rneui/themed";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export function CaptureButton({ onPress }: { onPress: () => void }) {
   return (
     <View style={styles.captureContainer}>
-      <View style={styles.captureButtonOuter}>
-        <Button
-          onPress={onPress}
-          buttonStyle={styles.captureButtonInner}
-          containerStyle={{ borderRadius: 50 }}
-          type="clear"
-        />
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={styles.captureButtonOuter}
+      >
+        <View style={styles.captureButtonInner} />
+      </Pressable>
     </View>
   );
 }

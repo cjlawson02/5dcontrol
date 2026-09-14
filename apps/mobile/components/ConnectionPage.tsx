@@ -1,39 +1,47 @@
-import { Button, Card, Input } from "@rneui/themed";
-import React, { useEffect, useState } from "react";
 import {
-  Keyboard,
-  Pressable,
-  StyleSheet,
+  Button,
+  FieldGroup,
+  Host,
   Text,
-  View,
-} from "react-native";
+  TextInput,
+  useNativeState,
+} from "@expo/ui";
+import React, { useEffect, useRef } from "react";
+import { Keyboard, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { formatIpv4Typing } from "../utils/formatIpv4";
 import { logger } from "../utils/logger";
 import { useWebSocketContext } from "./WebSocketContext";
 
+/** Android / web connection screen using Expo UI universal Form-style layout. */
 const ConnectionPage: React.FC = () => {
   const { status, ip, connect } = useWebSocketContext();
-  const [ipField, setIpField] = useState<string>(ip ?? "");
+  const ipField = useNativeState(ip ?? "");
+  const previousIp = useRef(ipField.value);
+  const isLoading = status === "loading";
 
   logger.debug(
-    `ConnectionPage: Render - status: ${status}, ip: ${ip}, ipField: ${ipField}`
+    `ConnectionPage: Render - status: ${status}, ip: ${ip}, ipField: ${ipField.value}`
   );
 
   useEffect(() => {
-    if (ip) {
+    if (ip != null && ip !== ipField.value) {
       logger.debug(`ConnectionPage: IP changed, updating field to: ${ip}`);
-      setIpField(ip);
+      ipField.value = ip;
+      previousIp.current = ip;
     }
-  }, [ip]);
+  }, [ip, ipField]);
 
   const handleIpChange = (text: string) => {
-    setIpField(text);
+    const formatted = formatIpv4Typing(text, previousIp.current);
+    previousIp.current = formatted;
+    ipField.value = formatted;
   };
 
   const handleSubmit = async () => {
-    const newIp = ipField.trim();
+    const newIp = ipField.value.trim().replace(/\.$/, "");
     logger.info(`ConnectionPage: Connect button clicked with IP: ${newIp}`);
-    if (!newIp) {
+    if (!newIp || isLoading) {
       return;
     }
     await connect(newIp);
@@ -44,27 +52,38 @@ const ConnectionPage: React.FC = () => {
       onPress={Keyboard.dismiss}
       accessible={false}
       testID="connection-container"
-      style={{ flex: 1 }}
+      style={styles.flex}
     >
       <SafeAreaView style={styles.container}>
-        <Text style={styles.logo}>5DControl</Text>
         <View style={styles.content}>
-          <Card>
-            <Card.Title>Server Connection</Card.Title>
-            <Card.Divider />
-            <Input
-              label="Server IP Address"
-              containerStyle={{ paddingHorizontal: 0 }}
-              inputStyle={styles.input}
-              value={ipField}
-              onChangeText={handleIpChange}
-              editable={!(status === "loading")}
-              placeholder="Enter server IP"
-              keyboardType="numeric"
-              autoCapitalize="none"
-            />
-            <Button title="Connect" onPress={handleSubmit} />
-          </Card>
+          <Host colorScheme="dark" style={styles.host}>
+            <FieldGroup style={{ backgroundColor: "#000000" }}>
+              <FieldGroup.Section title="Server Connection">
+                <Text textStyle={{ color: "#8E8E93", fontSize: 13 }}>
+                  Server IP Address
+                </Text>
+                <TextInput
+                  testID="server-ip-input"
+                  value={ipField}
+                  editable={!isLoading}
+                  placeholder="192.168.1.100"
+                  keyboardType="decimal-pad"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onChangeText={handleIpChange}
+                  onSubmitEditing={handleSubmit}
+                  style={{ width: "100%", height: 44 }}
+                />
+                <Button
+                  label={isLoading ? "Connecting…" : "Connect"}
+                  onPress={handleSubmit}
+                  disabled={isLoading}
+                  variant="filled"
+                />
+              </FieldGroup.Section>
+            </FieldGroup>
+          </Host>
         </View>
       </SafeAreaView>
     </Pressable>
@@ -72,42 +91,10 @@ const ConnectionPage: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: "column",
-    backgroundColor: "#181A20",
-    paddingTop: 0,
-    paddingHorizontal: 0,
-  },
-  logo: {
-    textAlign: "center",
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#fff",
-    marginTop: 24,
-    letterSpacing: 2,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  label: {
-    marginBottom: 8,
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#444",
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 16,
-    fontSize: 16,
-    color: "#fff",
-    backgroundColor: "#222",
-  },
+  flex: { flex: 1 },
+  container: { flex: 1, backgroundColor: "#000000" },
+  content: { flex: 1 },
+  host: { flex: 1 },
 });
 
 export default ConnectionPage;

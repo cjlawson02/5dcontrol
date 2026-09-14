@@ -38,11 +38,12 @@ describe("ConnectionPage", () => {
   });
 
   it("should render correctly", () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByPlaceholderText, getByDisplayValue } = render(
+      <ConnectionPage />
+    );
 
-    expect(getByText("5DControl")).toBeTruthy();
     expect(getByText("Server Connection")).toBeTruthy();
-    expect(getByText("Server IP Address")).toBeTruthy();
+    expect(getByPlaceholderText("Server IP Address")).toBeTruthy();
     expect(getByDisplayValue("192.168.1.1")).toBeTruthy();
     expect(getByText("Connect")).toBeTruthy();
   });
@@ -131,10 +132,11 @@ describe("ConnectionPage", () => {
   it("should disable input when status is loading", () => {
     mockWebSocketContext.status = "loading";
 
-    const { getByDisplayValue } = render(<ConnectionPage />);
+    const { getByDisplayValue, getByText } = render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     expect(input.props.editable).toBe(false);
+    expect(getByText("Connecting…")).toBeTruthy();
   });
 
   it("should enable input when status is not loading", () => {
@@ -149,7 +151,7 @@ describe("ConnectionPage", () => {
   it("should handle keyboard dismiss when touching outside", () => {
     const { getByTestId } = render(<ConnectionPage />);
 
-    const container = getByTestId("connection-container"); // TouchableWithoutFeedback
+    const container = getByTestId("connection-container");
     fireEvent.press(container);
 
     // Should not throw error
@@ -157,7 +159,7 @@ describe("ConnectionPage", () => {
   });
 
   it("should handle different IP formats", async () => {
-    const testIPs = ["10.0.0.1", "172.16.0.1", "localhost", "example.com"];
+    const testIPs = ["10.0.0.1", "172.16.0.1", "8.8.8.8"];
 
     for (const ip of testIPs) {
       const { getByText, getByDisplayValue, unmount } = render(
@@ -181,33 +183,31 @@ describe("ConnectionPage", () => {
     }
   });
 
-  it("should handle very long IP input", async () => {
-    const longIP = "192.168.1.1".repeat(10);
+  it("should clamp long input to four octets", async () => {
     const { getByText, getByDisplayValue } = render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, longIP);
+    fireEvent.changeText(input, "192.168.1.100.50");
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.connect).toHaveBeenCalledWith(longIP);
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.100");
     });
   });
 
-  it("should handle special characters in IP input", async () => {
-    const specialIP = "192.168.1.1:8080";
+  it("should strip non-IP characters", async () => {
     const { getByText, getByDisplayValue } = render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, specialIP);
+    fireEvent.changeText(input, "192.168.1.1:8080");
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.connect).toHaveBeenCalledWith(specialIP);
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.180");
     });
   });
 });

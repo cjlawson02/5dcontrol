@@ -27,6 +27,239 @@ jest.mock("expo-screen-orientation", () => ({
   },
 }));
 
+// Mock @expo/ui with RN stand-ins for unit tests
+jest.mock("@expo/ui", () => {
+  const React = require("react");
+  const { Pressable, Text, TextInput, View } = require("react-native");
+
+  function useNativeState(initialValue) {
+    const [val, setVal] = React.useState(initialValue);
+    const valRef = React.useRef(val);
+    valRef.current = val;
+    const stateRef = React.useRef(null);
+    if (stateRef.current === null) {
+      stateRef.current = {
+        get value() {
+          return valRef.current;
+        },
+        set value(v) {
+          valRef.current = v;
+          setVal(v);
+        },
+      };
+    }
+    return stateRef.current;
+  }
+
+  const Host = ({ children, ...props }) =>
+    React.createElement(View, { testID: "expo-ui-host", ...props }, children);
+
+  const Column = ({ children, ...props }) =>
+    React.createElement(View, { testID: "expo-ui-column", ...props }, children);
+
+  const FieldGroup = ({ children, ...props }) =>
+    React.createElement(
+      View,
+      { testID: "expo-ui-field-group", ...props },
+      children
+    );
+  FieldGroup.Section = ({ title, children, ...props }) =>
+    React.createElement(
+      View,
+      { testID: "expo-ui-field-section", ...props },
+      title ? React.createElement(Text, null, title) : null,
+      children
+    );
+
+  const Row = ({ children, ...props }) =>
+    React.createElement(View, { testID: "expo-ui-row", ...props }, children);
+
+  const Spacer = () => React.createElement(View, { testID: "expo-ui-spacer" });
+
+  const ExpoText = ({ children, ...props }) =>
+    React.createElement(Text, props, children);
+
+  const ExpoTextInput = ({
+    value,
+    onChangeText,
+    testID,
+    editable = true,
+    ...props
+  }) =>
+    React.createElement(TextInput, {
+      testID: testID ?? "expo-ui-text-input",
+      value: value?.value ?? "",
+      editable,
+      onChangeText: (text) => {
+        if (value) value.value = text;
+        onChangeText?.(text);
+      },
+      ...props,
+    });
+
+  const Button = ({ label, onPress, children, ...props }) =>
+    React.createElement(
+      Pressable,
+      {
+        accessibilityRole: "button",
+        onPress,
+        ...props,
+      },
+      React.createElement(Text, null, label ?? children)
+    );
+
+  const PickerItem = () => null;
+
+  const Picker = ({ children, selectedValue, onValueChange, testID }) => {
+    const items = React.Children.toArray(children)
+      .filter((child) => React.isValidElement(child))
+      .map((child) => child.props);
+
+    return React.createElement(
+      View,
+      { testID: testID ?? "expo-ui-picker" },
+      React.createElement(
+        Text,
+        { testID: "grid-type-selected-label" },
+        items.find((item) => item.value === selectedValue)?.label ??
+          String(selectedValue)
+      ),
+      items.map((item) =>
+        React.createElement(
+          Pressable,
+          {
+            key: String(item.value),
+            testID: `grid-type-option-${item.value}`,
+            onPress: () => onValueChange?.(item.value),
+            accessibilityRole: "button",
+          },
+          React.createElement(Text, null, item.label)
+        )
+      )
+    );
+  };
+  Picker.Item = PickerItem;
+
+  return {
+    Host,
+    Column,
+    FieldGroup,
+    Row,
+    Spacer,
+    Text: ExpoText,
+    TextInput: ExpoTextInput,
+    Button,
+    Picker,
+    useNativeState,
+  };
+});
+
+// Mock @expo/ui/swift-ui for iOS ConnectionPage / native Form screens
+jest.mock("@expo/ui/swift-ui", () => {
+  const React = require("react");
+  const { Pressable, Text, TextInput, View } = require("react-native");
+
+  function useNativeState(initialValue) {
+    const [val, setVal] = React.useState(initialValue);
+    const valRef = React.useRef(val);
+    valRef.current = val;
+    const stateRef = React.useRef(null);
+    if (stateRef.current === null) {
+      stateRef.current = {
+        get value() {
+          return valRef.current;
+        },
+        set value(v) {
+          valRef.current = v;
+          setVal(v);
+        },
+      };
+    }
+    return stateRef.current;
+  }
+
+  const Host = ({ children, ...props }) =>
+    React.createElement(View, { testID: "expo-ui-host", ...props }, children);
+
+  const Form = ({ children, ...props }) =>
+    React.createElement(View, { testID: "expo-ui-form", ...props }, children);
+
+  const Section = ({ title, footer, children, ...props }) =>
+    React.createElement(
+      View,
+      { testID: "expo-ui-section", ...props },
+      title ? React.createElement(Text, null, title) : null,
+      children,
+      footer
+    );
+
+  const ExpoText = ({ children, ...props }) =>
+    React.createElement(Text, props, children);
+
+  const TextField = ({ text, placeholder, onTextChange, modifiers, ...props }) => {
+    const isDisabled = (modifiers ?? []).some(
+      (mod) =>
+        (mod?.functionName === "disabled" || mod?.name === "disabled") &&
+        mod?.arg !== false
+    );
+    return React.createElement(TextInput, {
+      testID: "server-ip-input",
+      placeholder,
+      value: text?.value ?? "",
+      editable: !isDisabled,
+      onChangeText: (value) => {
+        if (onTextChange) {
+          onTextChange(value);
+        } else if (text) {
+          text.value = value;
+        }
+      },
+      ...props,
+    });
+  };
+
+  const Button = ({ label, onPress, modifiers, ...props }) =>
+    React.createElement(
+      Pressable,
+      {
+        accessibilityRole: "button",
+        onPress,
+        disabled: (modifiers ?? []).some(
+          (mod) =>
+            (mod?.functionName === "disabled" || mod?.name === "disabled") &&
+            mod?.arg !== false
+        ),
+        ...props,
+      },
+      React.createElement(Text, null, label)
+    );
+
+  return {
+    Host,
+    Form,
+    Section,
+    Text: ExpoText,
+    TextField,
+    Button,
+    useNativeState,
+  };
+});
+
+jest.mock("@expo/ui/swift-ui/modifiers", () => {
+  const mod = (name) => (arg) => ({ name, functionName: name, arg });
+  return {
+    listStyle: mod("listStyle"),
+    scrollContentBackground: mod("scrollContentBackground"),
+    keyboardType: mod("keyboardType"),
+    autocorrectionDisabled: mod("autocorrectionDisabled"),
+    submitLabel: mod("submitLabel"),
+    onSubmit: mod("onSubmit"),
+    buttonStyle: mod("buttonStyle"),
+    controlSize: mod("controlSize"),
+    disabled: mod("disabled"),
+  };
+});
+
 // Mock react-native-webview
 jest.mock("react-native-webview", () => {
   const { View } = require("react-native");

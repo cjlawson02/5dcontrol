@@ -3,7 +3,7 @@ module.exports = {
   testMatch: ["<rootDir>/__tests__/integration/**/*.test.{ts,tsx}"],
   testPathIgnorePatterns: ["/node_modules/", "/android/", "/ios/"],
   transformIgnorePatterns: [
-    "node_modules/(?!(react-native|@react-native|@react-native-community|@testing-library|expo|@expo|react-native-.*|@react-native-.*|@rneui|ws)/)",
+    "node_modules/(?!(react-native|@react-native|@react-native-community|@testing-library|expo|@expo|react-native-.*|@react-native-.*|ws)/)",
   ],
   collectCoverageFrom: [
     "**/*.{ts,tsx}",

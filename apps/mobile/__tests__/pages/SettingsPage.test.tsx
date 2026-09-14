@@ -1,20 +1,20 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 import SettingsPage from "../../app/settings";
 
-// Mock expo-router
-const mockRouter = {
-  push: jest.fn(),
-  back: jest.fn(),
-  replace: jest.fn(),
-  canGoBack: jest.fn().mockReturnValue(true),
-};
+jest.mock("expo-router", () => {
+  const mockRouter = {
+    push: jest.fn(),
+    back: jest.fn(),
+    replace: jest.fn(),
+    canGoBack: jest.fn().mockReturnValue(true),
+  };
+  return {
+    router: mockRouter,
+    useRouter: () => mockRouter,
+  };
+});
 
-jest.mock("expo-router", () => ({
-  router: mockRouter,
-  useRouter: () => mockRouter,
-}));
-
-// Mock AsyncStorage
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue("none"),
   setItem: jest.fn().mockResolvedValue(undefined),
@@ -22,9 +22,8 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
   clear: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock settings context
 const mockSettingsContext = {
-  state: { gridType: "none" },
+  state: { gridType: "none" as string | undefined },
   setGridType: jest.fn(),
 };
 
@@ -33,32 +32,6 @@ jest.mock("../../contexts/SettingsContext", () => ({
   useSettings: () => mockSettingsContext,
 }));
 
-// Mock GridIcons
-jest.mock("../../components/GridIcons", () => ({
-  NoGridIcon: ({ size, color }: { size?: number; color?: string }) => {
-    const React = require("react");
-    return React.createElement("View", {
-      testID: "no-grid-icon",
-      style: { width: size, height: size },
-    });
-  },
-  RuleOfThirdsIcon: ({ size, color }: { size?: number; color?: string }) => {
-    const React = require("react");
-    return React.createElement("View", {
-      testID: "rule-of-thirds-icon",
-      style: { width: size, height: size },
-    });
-  },
-  GoldenRatioIcon: ({ size, color }: { size?: number; color?: string }) => {
-    const React = require("react");
-    return React.createElement("View", {
-      testID: "golden-ratio-icon",
-      style: { width: size, height: size },
-    });
-  },
-}));
-
-// Don't wrap with SettingsProvider - use the mocked context instead
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <>{children}</>
 );
@@ -66,12 +39,11 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
 describe("SettingsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset mock state to default
     mockSettingsContext.state.gridType = "none";
   });
 
   it("should render correctly", () => {
-    const { getByText } = render(
+    const { getByText, getByTestId } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -80,69 +52,35 @@ describe("SettingsPage", () => {
     expect(getByText("Settings")).toBeTruthy();
     expect(getByText("← Back")).toBeTruthy();
     expect(getByText("Grid Overlay")).toBeTruthy();
-    expect(getByText("No Grid")).toBeTruthy();
+    expect(getByText("Type")).toBeTruthy();
+    expect(getByTestId("grid-type-picker")).toBeTruthy();
+    expect(getByTestId("grid-type-selected-label").props.children).toBe(
+      "No Grid"
+    );
   });
 
-  it("should display current grid type in dropdown", () => {
+  it("should display the current grid type", () => {
     mockSettingsContext.state.gridType = "rule-of-thirds";
 
-    const { getByText } = render(
+    const { getByTestId } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    expect(getByText("Rule of Thirds")).toBeTruthy();
+    expect(getByTestId("grid-type-selected-label").props.children).toBe(
+      "Rule of Thirds"
+    );
   });
 
-  it("should open dropdown when button is pressed", () => {
-    const { getByText } = render(
+  it("should call setGridType when a grid option is selected", async () => {
+    const { getByTestId } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    const dropdownButton = getByText("No Grid").parent?.parent;
-    fireEvent.press(dropdownButton!);
-
-    // Dropdown should be visible
-    expect(getByText("Rule of Thirds")).toBeTruthy();
-    expect(getByText("Golden Ratio")).toBeTruthy();
-  });
-
-  it("should close dropdown when button is pressed again", () => {
-    const { getByText, queryByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    const dropdownButton = getByText("No Grid").parent?.parent;
-
-    // Open dropdown
-    fireEvent.press(dropdownButton!);
-    expect(getByText("Rule of Thirds")).toBeTruthy();
-
-    // Close dropdown
-    fireEvent.press(dropdownButton!);
-    expect(queryByText("Rule of Thirds")).toBeNull();
-  });
-
-  it("should call setGridType when grid option is selected", async () => {
-    const { getByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    const dropdownButton = getByText("No Grid").parent?.parent;
-
-    // Open dropdown
-    fireEvent.press(dropdownButton!);
-
-    // Select rule of thirds
-    const ruleOfThirdsOption = getByText("Rule of Thirds");
-    fireEvent.press(ruleOfThirdsOption);
+    fireEvent.press(getByTestId("grid-type-option-rule-of-thirds"));
 
     await waitFor(() => {
       expect(mockSettingsContext.setGridType).toHaveBeenCalledWith(
@@ -151,196 +89,80 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("should close dropdown after selecting an option", async () => {
-    const { getByText, queryByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    const dropdownButton = getByText("No Grid").parent?.parent;
-
-    // Open dropdown
-    fireEvent.press(dropdownButton!);
-    expect(getByText("Rule of Thirds")).toBeTruthy();
-
-    // Select rule of thirds
-    const ruleOfThirdsOption = getByText("Rule of Thirds");
-    fireEvent.press(ruleOfThirdsOption);
-
-    await waitFor(() => {
-      expect(queryByText("Rule of Thirds")).toBeNull();
-    });
-  });
-
-  it("should show selected grid type with checkmark", () => {
-    mockSettingsContext.state.gridType = "rule-of-thirds";
-
-    const { getByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    const dropdownButton = getByText("Rule of Thirds").parent?.parent;
-    fireEvent.press(dropdownButton!);
-
-    // Should show checkmark for selected option
-    expect(getByText("✓")).toBeTruthy();
-  });
-
   it("should handle all grid types", () => {
-    const gridTypes = ["none", "rule-of-thirds", "golden-ratio"];
+    const expectedNames = {
+      none: "No Grid",
+      "rule-of-thirds": "Rule of Thirds",
+      "golden-ratio": "Golden Ratio",
+    } as const;
 
-    gridTypes.forEach((gridType) => {
-      mockSettingsContext.state.gridType = gridType as any;
+    (Object.keys(expectedNames) as (keyof typeof expectedNames)[]).forEach(
+      (gridType) => {
+        mockSettingsContext.state.gridType = gridType;
 
-      const { rerender, getByText } = render(
-        <TestWrapper>
-          <SettingsPage />
-        </TestWrapper>
-      );
+        const { getByTestId, unmount } = render(
+          <TestWrapper>
+            <SettingsPage />
+          </TestWrapper>
+        );
 
-      // Should display correct grid type name
-      const expectedNames = {
-        none: "No Grid",
-        "rule-of-thirds": "Rule of Thirds",
-        "golden-ratio": "Golden Ratio",
-      };
-
-      expect(
-        getByText(expectedNames[gridType as keyof typeof expectedNames])
-      ).toBeTruthy();
-
-      rerender(
-        <TestWrapper>
-          <SettingsPage />
-        </TestWrapper>
-      );
-    });
+        expect(getByTestId("grid-type-selected-label").props.children).toBe(
+          expectedNames[gridType]
+        );
+        unmount();
+      }
+    );
   });
 
-  it("should handle dropdown state changes correctly", () => {
-    const { getByText, queryByText } = render(
+  it("should select each grid option", async () => {
+    const { getByTestId } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    const dropdownButton = getByText("No Grid").parent?.parent;
-
-    // Initially closed
-    expect(queryByText("Rule of Thirds")).toBeNull();
-
-    // Open
-    fireEvent.press(dropdownButton!);
-    expect(getByText("Rule of Thirds")).toBeTruthy();
-
-    // Close
-    fireEvent.press(dropdownButton!);
-    expect(queryByText("Rule of Thirds")).toBeNull();
-  });
-
-  it("should handle rapid dropdown toggling", () => {
-    const { getByText, queryByText, getAllByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    // Find dropdown button by looking for any grid type text
-    const gridTypeTexts = ["No Grid", "Rule of Thirds", "Golden Ratio"];
-    let dropdownButton;
-    for (const text of gridTypeTexts) {
-      try {
-        const elements = getAllByText(text);
-        dropdownButton = elements[0].parent?.parent;
-        if (dropdownButton) break;
-      } catch (e) {
-        continue;
-      }
-    }
-
-    // Rapid toggling
-    fireEvent.press(dropdownButton!);
-    fireEvent.press(dropdownButton!);
-    fireEvent.press(dropdownButton!);
-    fireEvent.press(dropdownButton!);
-
-    // Should be open after even number of presses - check for any grid option
-    const hasGridOption = gridTypeTexts.some((text) => {
-      try {
-        getAllByText(text);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-    expect(hasGridOption).toBeTruthy();
-  });
-
-  it("should handle selection of different grid types", async () => {
-    const { getAllByText } = render(
-      <TestWrapper>
-        <SettingsPage />
-      </TestWrapper>
-    );
-
-    // Find and open dropdown button by looking for any grid type text
-    const gridTypeTexts = ["No Grid", "Rule of Thirds", "Golden Ratio"];
-    let dropdownButton;
-    for (const text of gridTypeTexts) {
-      try {
-        const elements = getAllByText(text);
-        dropdownButton = elements[0].parent?.parent;
-        if (dropdownButton) break;
-      } catch {
-        continue;
-      }
-    }
-
-    fireEvent.press(dropdownButton!);
-
-    // Test selecting each option
     const options = [
-      { text: "No Grid", value: "none" },
-      { text: "Rule of Thirds", value: "rule-of-thirds" },
-      { text: "Golden Ratio", value: "golden-ratio" },
+      { testID: "grid-type-option-none", value: "none" },
+      {
+        testID: "grid-type-option-rule-of-thirds",
+        value: "rule-of-thirds",
+      },
+      { testID: "grid-type-option-golden-ratio", value: "golden-ratio" },
     ];
 
     for (const option of options) {
-      try {
-        const optionElements = getAllByText(option.text);
-        // Find the option in the dropdown (not the button)
-        const optionElement = optionElements[optionElements.length > 1 ? 1 : 0];
-        fireEvent.press(optionElement);
-
-        await waitFor(() => {
-          expect(mockSettingsContext.setGridType).toHaveBeenCalledWith(
-            option.value
-          );
-        });
-
-        // Reopen dropdown for next selection
-        fireEvent.press(dropdownButton!);
-      } catch (e) {
-        // Option might not be visible, skip it
-        continue;
-      }
+      fireEvent.press(getByTestId(option.testID));
+      await waitFor(() => {
+        expect(mockSettingsContext.setGridType).toHaveBeenCalledWith(
+          option.value
+        );
+      });
     }
   });
 
-  it("should handle edge cases gracefully", () => {
-    // Test with undefined grid type
-    mockSettingsContext.state.gridType = undefined as any;
-
+  it("should navigate back when back is pressed", () => {
     const { getByText } = render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    // Should not crash
+    fireEvent.press(getByText("← Back"));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("should handle missing grid type gracefully", () => {
+    mockSettingsContext.state.gridType = undefined;
+
+    const { getByText, getByTestId } = render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
     expect(getByText("Settings")).toBeTruthy();
+    expect(getByTestId("grid-type-selected-label").props.children).toBe(
+      "No Grid"
+    );
   });
 });

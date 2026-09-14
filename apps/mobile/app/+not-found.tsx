@@ -1,17 +1,16 @@
-import { Button, Text } from "@rneui/themed";
 import { Link, Stack } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Oops!" }} />
       <View style={styles.container}>
-        <Text h4 style={styles.title}>
-          This screen does not exist.
-        </Text>
+        <Text style={styles.title}>This screen does not exist.</Text>
         <Link href="/" asChild>
-          <Button type="clear" title="Go to home screen!" />
+          <Pressable accessibilityRole="button">
+            <Text style={styles.link}>Go to home screen!</Text>
+          </Pressable>
         </Link>
       </View>
     </>
@@ -28,5 +27,11 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: 20,
     textAlign: "center",
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  link: {
+    color: "#007AFF",
+    fontSize: 16,
   },
 });

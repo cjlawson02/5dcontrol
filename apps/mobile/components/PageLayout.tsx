@@ -1,6 +1,11 @@
-import { Text } from "@rneui/themed";
 import { ReactNode } from "react";
-import { StyleSheet, TouchableOpacity, View, ViewStyle } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PageLayoutProps {

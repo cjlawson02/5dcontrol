@@ -1,10 +1,16 @@
 import { ControlType } from "@5dcontrol/proto";
 import { Feather } from "@expo/vector-icons";
-import { LinearProgress, Text } from "@rneui/themed";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraStream } from "../../components/CameraStream";
 import { GridOverlay } from "../../components/GridOverlay";
@@ -138,7 +144,7 @@ export default function HomeScreen() {
             Please ensure the camera is powered on and connected to the
             5DControl.
           </Text>
-          <LinearProgress />
+          <ActivityIndicator color="#fff" />
         </SafeAreaView>
       ) : (
         <>
@@ -205,10 +211,12 @@ export default function HomeScreen() {
               <View style={styles.captureButtonInner} />
             </TouchableOpacity>
 
-            {/* Gallery */}
+            {/* Gallery — route not wired yet */}
             <TouchableOpacity
               style={styles.navButton}
-              onPress={() => router.push("/gallery")}
+              onPress={() => {
+                logger.info("Gallery not available yet");
+              }}
               activeOpacity={0.7}
             >
               <Feather name="grid" color="#fff" size={24} />
