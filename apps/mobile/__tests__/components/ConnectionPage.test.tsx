@@ -18,6 +18,7 @@ const mockWebSocketContext = {
   ip: "192.168.1.1",
   setIp: jest.fn(),
   reconnect: jest.fn(),
+  connect: jest.fn().mockResolvedValue(undefined),
   sendCommand: jest.fn(),
 };
 
@@ -73,7 +74,7 @@ describe("ConnectionPage", () => {
     expect(getByDisplayValue("192.168.1.200")).toBeTruthy();
   });
 
-  it("should call setIp when IP changes and connect button is pressed", async () => {
+  it("should call connect when connect button is pressed with a new IP", async () => {
     const { getByText, getByDisplayValue } = render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
@@ -83,20 +84,19 @@ describe("ConnectionPage", () => {
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.setIp).toHaveBeenCalledWith("192.168.1.200");
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.200");
     });
   });
 
-  it("should call reconnect when IP is the same and connect button is pressed", async () => {
+  it("should call connect when IP is the same and connect button is pressed", async () => {
     const { getByText } = render(<ConnectionPage />);
 
     const connectButton = getByText("Connect");
 
-    // Don't change the IP
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.reconnect).toHaveBeenCalled();
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.1");
     });
   });
 
@@ -110,11 +110,11 @@ describe("ConnectionPage", () => {
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.setIp).toHaveBeenCalledWith("192.168.1.200");
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.200");
     });
   });
 
-  it("should handle empty IP input", async () => {
+  it("should not connect when IP input is empty", async () => {
     const { getByText, getByDisplayValue } = render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
@@ -124,7 +124,7 @@ describe("ConnectionPage", () => {
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.setIp).toHaveBeenCalledWith("");
+      expect(mockWebSocketContext.connect).not.toHaveBeenCalled();
     });
   });
 
@@ -160,7 +160,9 @@ describe("ConnectionPage", () => {
     const testIPs = ["10.0.0.1", "172.16.0.1", "localhost", "example.com"];
 
     for (const ip of testIPs) {
-      const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+      const { getByText, getByDisplayValue, unmount } = render(
+        <ConnectionPage />
+      );
 
       const input = getByDisplayValue("192.168.1.1");
       const connectButton = getByText("Connect");
@@ -169,10 +171,13 @@ describe("ConnectionPage", () => {
       fireEvent.press(connectButton);
 
       await waitFor(() => {
-        expect(mockWebSocketContext.setIp).toHaveBeenCalledWith(ip);
+        expect(mockWebSocketContext.connect).toHaveBeenCalledWith(ip);
       });
 
+      unmount();
       jest.clearAllMocks();
+      mockWebSocketContext.connect.mockResolvedValue(undefined);
+      mockWebSocketContext.ip = "192.168.1.1";
     }
   });
 
@@ -187,7 +192,7 @@ describe("ConnectionPage", () => {
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.setIp).toHaveBeenCalledWith(longIP);
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith(longIP);
     });
   });
 
@@ -202,7 +207,7 @@ describe("ConnectionPage", () => {
     fireEvent.press(connectButton);
 
     await waitFor(() => {
-      expect(mockWebSocketContext.setIp).toHaveBeenCalledWith(specialIP);
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith(specialIP);
     });
   });
 });

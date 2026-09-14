@@ -16,9 +16,11 @@ type ConnectionStatus = "connected" | "disconnected" | "loading";
 interface WebSocketContextValue {
   status: ConnectionStatus;
   cameraStatus: ConnectionStatus;
+  batteryLevel: number;
   ip: string | null;
   setIp: (ip: string | null) => void;
   reconnect: () => void;
+  connect: (ip: string) => Promise<void>;
   sendCommand: (type: ControlType) => void;
   loadIp?: () => Promise<void>;
 }
@@ -30,12 +32,10 @@ const WebSocketContext = createContext<WebSocketContextValue | undefined>(
 const buildCommandMessage = (type: ControlType): Uint8Array => {
   const builder = new Builder(64);
 
-  // Build Command table
   Command.startCommand(builder);
   Command.addType(builder, type);
   const commandOffset = Command.endCommand(builder);
 
-  // Build Message table
   Message.startMessage(builder);
   Message.addMessageType(builder, MessageType.COMMAND);
   Message.addCommand(builder, commandOffset);
@@ -51,6 +51,7 @@ const DEFAULT_IP = "192.168.1.1";
 export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const [status, setStatus] = useState<ConnectionStatus>("loading");
   const [cameraStatus, setCameraStatus] = useState<ConnectionStatus>("loading");
+  const [batteryLevel, setBatteryLevel] = useState<number>(0);
   const [ip, setInternalIp] = useState<string | null>(null);
   const [connectionTrigger, setConnectionTrigger] = useState(0);
 
@@ -59,75 +60,72 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  const setIp = useCallback(
-    async (newIp: string | null) => {
-      logger.debug(`WebSocket: setIp called with: ${newIp}, current IP: ${ip}`);
-      // Update state immediately
-      setInternalIp(newIp);
-      if (newIp) {
-        try {
-          await AsyncStorage.setItem(STORAGE_KEY, newIp);
-          logger.debug(`WebSocket: IP saved to storage: ${newIp}`);
-        } catch (error) {
-          logger.error(`WebSocket: Error saving IP to storage:`, error);
-        }
+  const setIp = useCallback(async (newIp: string | null) => {
+    logger.debug(`WebSocket: setIp called with: ${newIp}`);
+    setInternalIp(newIp);
+    if (newIp) {
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, newIp);
+        logger.debug(`WebSocket: IP saved to storage: ${newIp}`);
+      } catch (error) {
+        logger.error(`WebSocket: Error saving IP to storage:`, error);
       }
-    },
-    [ip]
-  );
+    }
+  }, []);
 
   const reconnect = useCallback(() => {
-    logger.debug(`WebSocket: reconnect called, current IP: ${ip}`);
-    setConnectionTrigger((prev) => {
-      logger.debug(
-        `WebSocket: Connection trigger incrementing from ${prev} to ${
-          prev + 1
-        }`
-      );
-      return prev + 1;
-    });
-  }, [ip]);
+    logger.debug(`WebSocket: reconnect called`);
+    setConnectionTrigger((prev) => prev + 1);
+  }, []);
+
+  const connect = useCallback(
+    async (targetIp: string) => {
+      logger.debug(`WebSocket: connect called with: ${targetIp}`);
+      setInternalIp(targetIp);
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, targetIp);
+      } catch (error) {
+        logger.error(`WebSocket: Error saving IP to storage:`, error);
+      }
+      setConnectionTrigger((prev) => prev + 1);
+    },
+    []
+  );
 
   const loadIp = useCallback(async () => {
     logger.debug(`WebSocket: Loading IP from storage`);
     try {
       const savedIp = await AsyncStorage.getItem(STORAGE_KEY);
       logger.debug(`WebSocket: Saved IP from storage: ${savedIp}`);
-      if (savedIp) {
-        setIp(savedIp);
-      } else {
-        logger.debug(`WebSocket: No saved IP, using default: ${DEFAULT_IP}`);
-        setIp(DEFAULT_IP);
-      }
+      // Prefill only — do not auto-connect until the user taps Connect.
+      setInternalIp(savedIp ?? DEFAULT_IP);
     } catch (error) {
       logger.error(`WebSocket: Error loading IP from storage:`, error);
+      setInternalIp(DEFAULT_IP);
     } finally {
       logger.debug(`WebSocket: Setting initial status to disconnected`);
       setDisconnected();
     }
-  }, []);
+  }, [setDisconnected]);
 
   useEffect(() => {
-    // Skip loading IP in test environment to allow mocking
     if (process.env.NODE_ENV !== "test") {
       loadIp();
     } else {
-      // In test environment, set default values
-      setIp(DEFAULT_IP);
+      setInternalIp(DEFAULT_IP);
       setDisconnected();
     }
-  }, [loadIp]);
+  }, [loadIp, setDisconnected]);
 
   useEffect(() => {
-    logger.debug(
-      `WebSocket: useEffect triggered with IP: ${ip}, trigger: ${connectionTrigger}`
-    );
-    if (!ip) {
-      logger.debug(`WebSocket: No IP provided, skipping connection`);
+    // Wait for an explicit Connect/reconnect before opening a socket.
+    if (connectionTrigger === 0 || !ip) {
+      logger.debug(
+        `WebSocket: Skipping connect (trigger=${connectionTrigger}, ip=${ip})`
+      );
       return;
     }
 
-    // Close existing connection if any
     if (wsRef.current) {
       logger.debug(`WebSocket: Closing existing connection`);
       wsRef.current.close();
@@ -136,13 +134,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const wsUrl = `ws://${ip}:8888/ws`;
     logger.info(`WebSocket: Creating new connection to: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
+    ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
     ws.onopen = () => {
       logger.info(`WebSocket: Connection opened successfully to ${wsUrl}`);
       setConnected();
 
-      // Request camera status
       const msg = buildCommandMessage(ControlType.QUERY_STATUS);
       logger.debug(`WebSocket: Sending QUERY_STATUS command`);
       ws.send(msg);
@@ -158,22 +156,65 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
       logger.error(`WebSocket: Connection error:`, error);
     };
 
-    ws.onmessage = (e) => {
-      logger.debug(`WebSocket: Message received, data type: ${typeof e.data}, is ArrayBuffer: ${e.data instanceof ArrayBuffer}`);
-      const data = new Uint8Array(e.data);
-      const msg = Message.getRootAsMessage(new ByteBuffer(data));
+    ws.onmessage = async (e) => {
+      logger.debug(
+        `WebSocket: Message received, data type: ${typeof e.data}, is ArrayBuffer: ${
+          e.data instanceof ArrayBuffer
+        }`
+      );
 
-      if (msg.messageType() === MessageType.STATUS) {
-        const status = msg.status();
-        if (status) {
-          const connected = status.cameraConnected();
+      let data: Uint8Array;
+      if (e.data instanceof ArrayBuffer) {
+        data = new Uint8Array(e.data);
+      } else if (e.data instanceof Blob) {
+        logger.debug(
+          `WebSocket: Received Blob data, converting to ArrayBuffer`
+        );
+        try {
+          const arrayBuffer = await e.data.arrayBuffer();
+          data = new Uint8Array(arrayBuffer);
+        } catch (error) {
+          logger.error(
+            `WebSocket: Error converting Blob to ArrayBuffer:`,
+            error
+          );
+          return;
+        }
+      } else if (typeof e.data === "string") {
+        logger.error(`WebSocket: Received string data instead of binary`);
+        return;
+      } else {
+        data = new Uint8Array(e.data);
+      }
+
+      logger.debug(`WebSocket: Data length: ${data.length} bytes`);
+      const msg = Message.getRootAsMessage(new ByteBuffer(data));
+      const msgType = msg.messageType();
+      logger.debug(
+        `WebSocket: Message type: ${msgType} (STATUS=${MessageType.STATUS}, COMMAND=${MessageType.COMMAND})`
+      );
+
+      if (msgType === MessageType.STATUS) {
+        const statusMsg = msg.status();
+        logger.debug(
+          `WebSocket: Status object: ${statusMsg ? "exists" : "null"}`
+        );
+        if (statusMsg) {
+          const connected = statusMsg.cameraConnected();
           logger.info(
             `WebSocket: Camera status: ${
               connected ? "connected" : "disconnected"
             }`
           );
           setCameraStatus(connected ? "connected" : "disconnected");
+          setBatteryLevel(statusMsg.batteryLevel());
+        } else {
+          logger.warn(
+            `WebSocket: Received STATUS message but status object is null`
+          );
         }
+      } else {
+        logger.warn(`WebSocket: Received non-STATUS message, type: ${msgType}`);
       }
     };
 
@@ -184,8 +225,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         wsRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ip, connectionTrigger]);
+  }, [ip, connectionTrigger, setConnected, setDisconnected]);
 
   const sendCommand = useCallback((type: ControlType) => {
     logger.debug(`WebSocket: Sending command: ${ControlType[type]}`);
@@ -196,9 +236,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const value: WebSocketContextValue = {
     status,
     cameraStatus,
+    batteryLevel,
     ip,
     setIp,
     reconnect,
+    connect,
     sendCommand,
     loadIp,
   };

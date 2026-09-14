@@ -45,10 +45,23 @@ jest.mock("react-native-webview", () => {
 // Mock flatbuffers
 jest.mock("flatbuffers", () => ({
   Builder: jest.fn().mockImplementation(() => ({
+    startObject: jest.fn(),
+    endObject: jest.fn(() => 0),
+    addFieldInt8: jest.fn(),
+    addFieldInt16: jest.fn(),
+    addFieldInt32: jest.fn(),
+    addFieldInt64: jest.fn(),
+    addFieldOffset: jest.fn(),
+    addOffset: jest.fn(),
+    createString: jest.fn(() => 0),
     asUint8Array: jest.fn(() => new Uint8Array([1, 2, 3, 4])),
     finish: jest.fn(),
   })),
-  ByteBuffer: jest.fn(),
+  ByteBuffer: jest.fn().mockImplementation(() => ({
+    position: jest.fn(() => 0),
+    readInt32: jest.fn(() => 0),
+    setPosition: jest.fn(),
+  })),
 }));
 
 // Mock WebSocket

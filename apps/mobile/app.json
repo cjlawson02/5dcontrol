@@ -7,16 +7,16 @@
     "icon": "./assets/images/icon.png",
     "scheme": "fivedcontrol",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cjlawson02.fivedcontrol"
     },
     "android": {
+      "package": "com.cjlawson02.fivedcontrol",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
     "web": {
       "bundler": "metro",

@@ -1,8 +1,8 @@
 {
     "name": "@5dcontrol/proto",
     "private": true,
-    "main": "dist/control.js",
-    "types": "dist/control.d.ts",
+    "main": "dist/control.ts",
+    "types": "dist/control.ts",
     "files": [
         "dist"
     ],

@@ -12,9 +12,15 @@ export function GridOverlay({ type, visible }: GridOverlayProps) {
   }
 
   return (
-    <View testID="grid-overlay" style={styles.container} pointerEvents="none">
-      {type === "rule-of-thirds" && <RuleOfThirds />}
-      {type === "golden-ratio" && <GoldenRatio />}
+    <View
+      testID="grid-overlay"
+      style={styles.container}
+      pointerEvents="none"
+    >
+      <View style={styles.previewContainer}>
+        {type === "rule-of-thirds" && <RuleOfThirds />}
+        {type === "golden-ratio" && <GoldenRatio />}
+      </View>
     </View>
   );
 }
@@ -56,8 +62,15 @@ function GoldenRatio() {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 5,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  previewContainer: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    maxHeight: "100%",
   },
   line: {
     position: "absolute",

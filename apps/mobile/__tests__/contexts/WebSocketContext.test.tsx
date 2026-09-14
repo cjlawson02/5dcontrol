@@ -1,4 +1,4 @@
-import { ControlType } from "@5dcontrol/proto";
+import { ControlType, Message, MessageType } from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
@@ -16,11 +16,14 @@ describe("WebSocketContext", () => {
     mockAsyncStorage.setItem.mockResolvedValue();
   });
 
+  // Helper function to create wrapper with all required providers
+  const createWrapper = () => ({ children }: { children: React.ReactNode }) => (
+    <WebSocketProvider>{children}</WebSocketProvider>
+  );
+
   describe("WebSocketProvider", () => {
     it("should provide initial loading state", () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -33,9 +36,7 @@ describe("WebSocketContext", () => {
     it("should load default IP from storage on mount", async () => {
       mockAsyncStorage.getItem.mockResolvedValue("192.168.1.100");
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -53,9 +54,7 @@ describe("WebSocketContext", () => {
     it("should use default IP when no saved IP exists", async () => {
       mockAsyncStorage.getItem.mockResolvedValue(null);
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -73,9 +72,7 @@ describe("WebSocketContext", () => {
     it("should handle storage errors gracefully", async () => {
       mockAsyncStorage.getItem.mockRejectedValue(new Error("Storage error"));
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -93,9 +90,7 @@ describe("WebSocketContext", () => {
 
   describe("setIp", () => {
     it("should update IP and save to storage", async () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -114,9 +109,7 @@ describe("WebSocketContext", () => {
     it("should handle storage errors when setting IP", async () => {
       mockAsyncStorage.setItem.mockRejectedValue(new Error("Storage error"));
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -131,9 +124,7 @@ describe("WebSocketContext", () => {
 
   describe("reconnect", () => {
     it("should trigger reconnection", async () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -164,16 +155,24 @@ describe("WebSocketContext", () => {
         onmessage: null,
       };
 
-      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
       );
+
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
+      });
+
+      act(() => {
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(global.WebSocket).toHaveBeenCalled();
       });
 
       act(() => {
@@ -184,9 +183,7 @@ describe("WebSocketContext", () => {
     });
 
     it("should not send command when WebSocket is not available", async () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -228,17 +225,17 @@ describe("WebSocketContext", () => {
       const mockWebSocket = {
         close: jest.fn(),
         send: jest.fn(),
-        onopen: jest.fn(),
-        onclose: jest.fn(),
+        onopen: null as null | (() => void),
+        onclose: null as null | ((e: { code: number; reason: string }) => void),
         onerror: null,
         onmessage: null,
       };
 
-      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
       );
+
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -246,22 +243,24 @@ describe("WebSocketContext", () => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      // Simulate WebSocket open
       act(() => {
-        if (mockWebSocket.onopen) {
-          mockWebSocket.onopen();
-        }
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket.onopen).toEqual(expect.any(Function));
+      });
+
+      act(() => {
+        mockWebSocket.onopen?.();
       });
 
       await waitFor(() => {
         expect(result.current.status).toBe("connected");
       });
 
-      // Simulate WebSocket close
       act(() => {
-        if (mockWebSocket.onclose) {
-          mockWebSocket.onclose({ code: 1000, reason: "Normal closure" });
-        }
+        mockWebSocket.onclose?.({ code: 1000, reason: "Normal closure" });
       });
 
       await waitFor(() => {
@@ -276,15 +275,15 @@ describe("WebSocketContext", () => {
         send: jest.fn(),
         onopen: null,
         onclose: null,
-        onerror: jest.fn(),
+        onerror: null as null | ((e: Error) => void),
         onmessage: null,
       };
 
-      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
       );
+
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -292,32 +291,49 @@ describe("WebSocketContext", () => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      // Simulate WebSocket error
       act(() => {
-        if (mockWebSocket.onerror) {
-          mockWebSocket.onerror(new Error("Connection failed"));
-        }
+        result.current.reconnect();
       });
 
-      // Error should be handled gracefully without changing state
+      await waitFor(() => {
+        expect(mockWebSocket.onerror).toEqual(expect.any(Function));
+      });
+
+      act(() => {
+        mockWebSocket.onerror?.(new Error("Connection failed"));
+      });
+
       expect(result.current.status).toBe("disconnected");
     });
 
     it("should handle WebSocket message events", async () => {
+      const mockStatus = {
+        cameraConnected: jest.fn(() => true),
+        batteryLevel: jest.fn(() => 85),
+      };
+      const mockMessage = {
+        messageType: jest.fn(() => MessageType.STATUS),
+        status: jest.fn(() => mockStatus),
+      };
+
+      jest
+        .spyOn(Message, "getRootAsMessage")
+        .mockReturnValue(mockMessage as any);
+
       const mockWebSocket = {
         close: jest.fn(),
         send: jest.fn(),
         onopen: null,
         onclose: null,
         onerror: null,
-        onmessage: jest.fn(),
+        onmessage: null as null | ((e: { data: Uint8Array }) => Promise<void>),
       };
 
-      (global.WebSocket as unknown as jest.Mock).mockImplementation(() => mockWebSocket);
-
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
       );
+
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
@@ -325,13 +341,18 @@ describe("WebSocketContext", () => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      // Simulate WebSocket message
       act(() => {
-        if (mockWebSocket.onmessage) {
-          mockWebSocket.onmessage({
-            data: new Uint8Array([1, 2, 3, 4]),
-          });
-        }
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket.onmessage).toEqual(expect.any(Function));
+      });
+
+      await act(async () => {
+        await mockWebSocket.onmessage?.({
+          data: new Uint8Array([1, 2, 3, 4]),
+        });
       });
 
       await waitFor(() => {
@@ -340,13 +361,14 @@ describe("WebSocketContext", () => {
     });
 
     it("should close existing connection before creating new one", async () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <WebSocketProvider>{children}</WebSocketProvider>
-      );
+      const wrapper = createWrapper();
 
       const { result } = renderHook(() => useWebSocketContext(), { wrapper });
 
-      // Mock WebSocket
+      await waitFor(() => {
+        expect(result.current.ip).toBe("192.168.1.1");
+      });
+
       const mockWebSocket1 = {
         close: jest.fn(),
         send: jest.fn(),
@@ -371,18 +393,24 @@ describe("WebSocketContext", () => {
         return callCount === 1 ? mockWebSocket1 : mockWebSocket2;
       });
 
-      // First connection
-      act(() => {
-        result.current.setIp("192.168.1.100");
+      await act(async () => {
+        await result.current.setIp("192.168.1.100");
+        result.current.reconnect();
       });
 
-      // Second connection should close the first one
-      act(() => {
-        result.current.setIp("192.168.1.200");
+      await waitFor(() => {
+        expect(callCount).toBe(1);
       });
 
-      expect(mockWebSocket1.close).toHaveBeenCalled();
-      expect(mockWebSocket2.close).not.toHaveBeenCalled();
+      await act(async () => {
+        await result.current.setIp("192.168.1.200");
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket1.close).toHaveBeenCalled();
+        expect(callCount).toBe(2);
+      });
     });
   });
 });

@@ -12,7 +12,7 @@ import { logger } from "../utils/logger";
 import { useWebSocketContext } from "./WebSocketContext";
 
 const ConnectionPage: React.FC = () => {
-  const { status, ip, setIp, reconnect } = useWebSocketContext();
+  const { status, ip, connect } = useWebSocketContext();
   const [ipField, setIpField] = useState<string>(ip ?? "");
 
   logger.debug(
@@ -31,17 +31,12 @@ const ConnectionPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    logger.info(
-      `ConnectionPage: Connect button clicked with IP: ${ipField.trim()}`
-    );
     const newIp = ipField.trim();
-    if (newIp !== ip) {
-      logger.debug(`ConnectionPage: IP changed, calling setIp`);
-      setIp(newIp);
-    } else {
-      logger.debug(`ConnectionPage: Same IP, calling reconnect`);
-      reconnect();
+    logger.info(`ConnectionPage: Connect button clicked with IP: ${newIp}`);
+    if (!newIp) {
+      return;
     }
+    await connect(newIp);
   };
 
   return (

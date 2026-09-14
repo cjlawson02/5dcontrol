@@ -17,6 +17,9 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Continuous Native Generation — regenerate with `npx expo prebuild` / `expo run:*`
+apps/mobile/ios/
+apps/mobile/android/
 
 # Metro
 .metro-health-check*

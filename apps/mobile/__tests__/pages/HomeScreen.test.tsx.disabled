@@ -1,4 +1,4 @@
-import { ControlType } from "@proto/control";
+import { ControlType } from "@5dcontrol/proto";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import React from "react";
 import HomeScreen from "../../app/(tabs)/index";
@@ -32,7 +32,7 @@ const mockHaptics = {
 jest.mock("expo-haptics", () => mockHaptics);
 
 // Mock the proto module
-jest.mock("@proto/control", () => ({
+jest.mock("@5dcontrol/proto", () => ({
   ControlType: {
     FOCUS: 1,
     CAPTURE: 2,
