@@ -5,30 +5,47 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraStream } from "../../components/CameraStream";
 import { GridOverlay } from "../../components/GridOverlay";
+import {
+  ViewfinderGlass,
+  ViewfinderGlassContainer,
+} from "../../components/ViewfinderGlass";
 import { useWebSocketContext } from "../../components/WebSocketContext";
 import { useSettings } from "../../contexts/SettingsContext";
 import { logger } from "../../utils/logger";
 
 export default function HomeScreen() {
   const [focusActive, setFocusActive] = useState(false);
-  const [captureFlash, setCaptureFlash] = useState(false);
   const frameTimes = useRef<number[]>([]);
-  const flashOpacity = useRef(new Animated.Value(0)).current;
+  const flashOpacity = useSharedValue(0);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { cameraStatus, ip, sendCommand, status, batteryLevel } = useWebSocketContext();
+  const { cameraStatus, ip, sendCommand, status, batteryLevel } =
+    useWebSocketContext();
   const { state: settings } = useSettings();
 
+  const flashStyle = useAnimatedStyle(() => ({
+    opacity: flashOpacity.value,
+  }));
+
+  const notifyCaptureSuccess = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   const handleFocus = () => {
-    // Don't allow focus if camera is not connected
     if (cameraStatus !== "connected") {
       return;
     }
@@ -40,48 +57,34 @@ export default function HomeScreen() {
   };
 
   const handleCapture = () => {
-    // Medium impact haptic for capture
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Send capture command
     sendCommand(ControlType.CAPTURE);
 
-    // Trigger flash animation
-    setCaptureFlash(true);
-    Animated.sequence([
-      Animated.timing(flashOpacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(flashOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setCaptureFlash(false);
-      // Success haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    });
+    // Separate non-glass overlay — never fade GlassView via parent opacity
+    flashOpacity.value = withSequence(
+      withTiming(1, { duration: 100 }),
+      withTiming(0, { duration: 200 }, (finished) => {
+        if (finished) {
+          runOnJS(notifyCaptureSuccess)();
+        }
+      })
+    );
   };
 
   const handleCapturePressIn = () => {
     if (cameraStatus !== "connected") {
       return;
     }
-    // Start timer for long press (focus)
     pressTimer.current = setTimeout(() => {
       handleFocus();
       pressTimer.current = null;
-    }, 300); // 300ms for long press
+    }, 300);
   };
 
   const handleCapturePressOut = () => {
     if (cameraStatus !== "connected") {
       return;
     }
-    // If timer is still active, it was a short press (capture)
     if (pressTimer.current) {
       clearTimeout(pressTimer.current);
       pressTimer.current = null;
@@ -102,15 +105,15 @@ export default function HomeScreen() {
   };
 
   const getBatteryColor = (level: number) => {
-    if (level > 50) return "#4CAF50"; // Green
-    if (level > 20) return "#FFC107"; // Yellow/Amber
-    return "#F44336"; // Red
+    if (level > 50) return "#4CAF50";
+    if (level > 20) return "#FFC107";
+    return "#F44336";
   };
 
   const getConnectionColor = () => {
-    if (cameraStatus === "connected") return "#4CAF50"; // Green
-    if (status === "connected") return "#FFC107"; // Yellow - server connected but camera disconnected
-    return "#F44336"; // Red - fully disconnected
+    if (cameraStatus === "connected") return "#4CAF50";
+    if (status === "connected") return "#FFC107";
+    return "#F44336";
   };
 
   return (
@@ -158,70 +161,96 @@ export default function HomeScreen() {
               <View style={styles.focusBox} />
             </View>
           )}
-          {captureFlash && (
-            <Animated.View
-              style={[styles.captureFlash, { opacity: flashOpacity }]}
-            />
-          )}
 
-          {/* Top-left connection status and camera mode */}
+          {/* Non-glass full-screen flash layer (Reanimated) */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.captureFlash, flashStyle]}
+          />
+
           <View style={styles.leftNav}>
-            <View style={styles.connectionIndicator}>
-              <Feather
-                name="wifi"
-                color={getConnectionColor()}
-                size={20}
-              />
-              <Text style={[styles.connectionText, { color: getConnectionColor() }]}>
-                {cameraStatus === "connected" ? "Camera" : status === "connected" ? "Server" : "Offline"}
+            <ViewfinderGlass
+              style={styles.connectionIndicator}
+              fallbackStyle={styles.chromeFallback}
+            >
+              <Feather name="wifi" color={getConnectionColor()} size={20} />
+              <Text
+                style={[styles.connectionText, { color: getConnectionColor() }]}
+              >
+                {cameraStatus === "connected"
+                  ? "Camera"
+                  : status === "connected"
+                    ? "Server"
+                    : "Offline"}
               </Text>
-            </View>
+            </ViewfinderGlass>
           </View>
 
-          {/* Right side navigation - consolidated */}
-          <View style={styles.rightNav}>
-            {/* Battery indicator */}
-            <View style={styles.batteryIndicator}>
+          <ViewfinderGlassContainer style={styles.rightNav} spacing={16}>
+            <ViewfinderGlass
+              style={styles.batteryIndicator}
+              fallbackStyle={styles.chromeFallback}
+            >
               <Feather
                 name="battery-charging"
                 color={getBatteryColor(batteryLevel)}
                 size={20}
               />
-              <Text style={[styles.batteryText, { color: getBatteryColor(batteryLevel) }]}>
+              <Text
+                style={[
+                  styles.batteryText,
+                  { color: getBatteryColor(batteryLevel) },
+                ]}
+              >
                 {batteryLevel}%
               </Text>
-            </View>
+            </ViewfinderGlass>
 
-            {/* Settings */}
-            <TouchableOpacity
-              style={styles.navButton}
+            <Pressable
               onPress={openSettings}
-              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
-              <Feather name="settings" color="#fff" size={24} />
-            </TouchableOpacity>
+              <ViewfinderGlass
+                style={styles.navButton}
+                fallbackStyle={styles.navButtonFallback}
+                isInteractive
+              >
+                <Feather name="settings" color="#fff" size={24} />
+              </ViewfinderGlass>
+            </Pressable>
 
-            {/* Capture/Focus button */}
-            <TouchableOpacity
-              style={styles.captureButton}
+            <Pressable
               onPressIn={handleCapturePressIn}
               onPressOut={handleCapturePressOut}
-              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Capture"
             >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
+              <ViewfinderGlass
+                style={styles.captureButton}
+                fallbackStyle={styles.captureButtonFallback}
+                isInteractive
+              >
+                <View style={styles.captureButtonInner} />
+              </ViewfinderGlass>
+            </Pressable>
 
-            {/* Gallery — route not wired yet */}
-            <TouchableOpacity
-              style={styles.navButton}
+            <Pressable
               onPress={() => {
                 logger.info("Gallery not available yet");
               }}
-              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Gallery"
             >
-              <Feather name="grid" color="#fff" size={24} />
-            </TouchableOpacity>
-          </View>
+              <ViewfinderGlass
+                style={styles.navButton}
+                fallbackStyle={styles.navButtonFallback}
+                isInteractive
+              >
+                <Feather name="grid" color="#fff" size={24} />
+              </ViewfinderGlass>
+            </Pressable>
+          </ViewfinderGlassContainer>
         </>
       )}
     </View>
@@ -237,7 +266,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "#fff",
     zIndex: 100,
-    pointerEvents: "none",
   },
   focusIndicator: {
     ...StyleSheet.absoluteFill,
@@ -276,15 +304,22 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "rgba(144, 144, 144, 0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  navButtonFallback: {
+    backgroundColor: "rgba(144, 144, 144, 0.5)",
+  },
+  chromeFallback: {
+    backgroundColor: "rgba(144, 144, 144, 0.35)",
   },
   connectionIndicator: {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 16,
   },
   connectionText: {
     fontSize: 12,
@@ -294,6 +329,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 16,
   },
   batteryText: {
     fontSize: 10,
@@ -304,9 +341,11 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  captureButtonFallback: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,

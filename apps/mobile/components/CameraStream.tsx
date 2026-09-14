@@ -1,26 +1,162 @@
-import { StyleSheet } from "react-native";
+import { useCallback } from "react";
+import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import WebView from "react-native-webview";
+
+const MIN_SCALE = 1;
+const MAX_SCALE = 5;
 
 interface Props {
   url: string;
   onFrame?: () => void;
 }
 
+function clamp(value: number, min: number, max: number) {
+  "worklet";
+  return Math.min(max, Math.max(min, value));
+}
+
+function maxTranslate(scale: number, size: number) {
+  "worklet";
+  return Math.max(0, ((scale - 1) * size) / 2);
+}
+
 export function CameraStream({ url, onFrame }: Props) {
-  const handleMessage = (event: any) => {
-    const data = event.nativeEvent.data;
-    if (data === "frame" && onFrame) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+  const containerWidth = useSharedValue(0);
+  const containerHeight = useSharedValue(0);
+
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      containerWidth.value = event.nativeEvent.layout.width;
+      containerHeight.value = event.nativeEvent.layout.height;
+    },
+    [containerWidth, containerHeight]
+  );
+
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      savedScale.value = scale.value;
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      const nextScale = clamp(
+        savedScale.value * event.scale,
+        MIN_SCALE,
+        MAX_SCALE
+      );
+      scale.value = nextScale;
+
+      const maxX = maxTranslate(nextScale, containerWidth.value);
+      const maxY = maxTranslate(nextScale, containerHeight.value);
+      translateX.value = clamp(translateX.value, -maxX, maxX);
+      translateY.value = clamp(translateY.value, -maxY, maxY);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value <= MIN_SCALE) {
+        scale.value = withTiming(MIN_SCALE);
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        savedScale.value = MIN_SCALE;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+        return;
+      }
+
+      const maxX = maxTranslate(scale.value, containerWidth.value);
+      const maxY = maxTranslate(scale.value, containerHeight.value);
+      translateX.value = clamp(translateX.value, -maxX, maxX);
+      translateY.value = clamp(translateY.value, -maxY, maxY);
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      if (scale.value <= MIN_SCALE) {
+        translateX.value = 0;
+        translateY.value = 0;
+        return;
+      }
+
+      const maxX = maxTranslate(scale.value, containerWidth.value);
+      const maxY = maxTranslate(scale.value, containerHeight.value);
+      translateX.value = clamp(
+        savedTranslateX.value + event.translationX,
+        -maxX,
+        maxX
+      );
+      translateY.value = clamp(
+        savedTranslateY.value + event.translationY,
+        -maxY,
+        maxY
+      );
+    })
+    .onEnd(() => {
+      if (scale.value <= MIN_SCALE) {
+        translateX.value = 0;
+        translateY.value = 0;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+        return;
+      }
+
+      const maxX = maxTranslate(scale.value, containerWidth.value);
+      const maxY = maxTranslate(scale.value, containerHeight.value);
+      translateX.value = clamp(translateX.value, -maxX, maxX);
+      translateY.value = clamp(translateY.value, -maxY, maxY);
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const gesture = Gesture.Simultaneous(pinch, pan);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const handleMessage = (event: { nativeEvent: { data: string } }) => {
+    if (event.nativeEvent.data === "frame" && onFrame) {
       onFrame();
     }
   };
 
   return (
-    <WebView
-      source={{
-        html: `
+    <View
+      style={StyleSheet.absoluteFill}
+      onLayout={onLayout}
+      testID="camera-stream"
+    >
+      <Animated.View
+        style={[StyleSheet.absoluteFill, animatedStyle]}
+        pointerEvents="none"
+      >
+        <WebView
+          source={{
+            html: `
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
               * {
                 -webkit-user-select: none;
@@ -34,150 +170,43 @@ export function CameraStream({ url, onFrame }: Props) {
                 height: 100%;
                 overflow: hidden;
                 background: black;
-                position: fixed;
-                touch-action: none;
               }
-              #container {
-                width: 100vw;
-                height: 100vh;
-                position: relative;
-                overflow: hidden;
-              }
-              #view {
-                width: 100vw;
-                height: 100vh;
+              img {
+                width: 100%;
+                height: 100%;
                 object-fit: contain;
-                position: absolute;
-                top: 0;
-                left: 0;
-                transform-origin: center center;
+                display: block;
               }
             </style>
         </head>
         <body>
-            <div id="container">
-                <img id="view" src="${url}" />
-            </div>
+            <img id="view" src="${url}" />
             <script>
-            const img = document.getElementById('view');
-            const container = document.getElementById('container');
-
-            img.onload = () => window.ReactNativeWebView.postMessage('frame');
-
-            // Zoom and pan state
-            let scale = 1;
-            let translateX = 0;
-            let translateY = 0;
-
-            // Touch handling
-            let lastDistance = 0;
-            let lastCenter = { x: 0, y: 0 };
-            let isPinching = false;
-
-            function getDistance(touches) {
-                const dx = touches[0].clientX - touches[1].clientX;
-                const dy = touches[0].clientY - touches[1].clientY;
-                return Math.sqrt(dx * dx + dy * dy);
-            }
-
-            function getCenter(touches) {
-                return {
-                    x: (touches[0].clientX + touches[1].clientX) / 2,
-                    y: (touches[0].clientY + touches[1].clientY) / 2
-                };
-            }
-
-            function constrainTranslate() {
-                const maxTranslate = Math.max(0, (scale - 1) * window.innerWidth / 2);
-                const maxTranslateY = Math.max(0, (scale - 1) * window.innerHeight / 2);
-
-                translateX = Math.max(-maxTranslate, Math.min(maxTranslate, translateX));
-                translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY));
-            }
-
-            function updateTransform() {
-                img.style.transform = \`translate(\${translateX}px, \${translateY}px) scale(\${scale})\`;
-            }
-
-            container.addEventListener('touchstart', function(e) {
-                if (e.touches.length === 2) {
-                    e.preventDefault();
-                    isPinching = true;
-                    lastDistance = getDistance(e.touches);
-                    lastCenter = getCenter(e.touches);
-                } else if (e.touches.length === 1) {
-                    if (scale > 1) {
-                        e.preventDefault();
-                    }
-                    lastCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                }
-            }, { passive: false });
-
-            container.addEventListener('touchmove', function(e) {
-                if (e.touches.length === 2 && isPinching) {
-                    e.preventDefault();
-
-                    // Calculate zoom
-                    const distance = getDistance(e.touches);
-                    const deltaScale = distance / lastDistance;
-                    const newScale = scale * deltaScale;
-
-                    // Constrain zoom between 1.0 and 5.0
-                    scale = Math.max(1.0, Math.min(5.0, newScale));
-
-                    // Calculate pan
-                    const center = getCenter(e.touches);
-                    const deltaX = center.x - lastCenter.x;
-                    const deltaY = center.y - lastCenter.y;
-
-                    translateX += deltaX;
-                    translateY += deltaY;
-
-                    constrainTranslate();
-                    updateTransform();
-
-                    lastDistance = distance;
-                    lastCenter = center;
-                } else if (e.touches.length === 1 && scale > 1) {
-                    e.preventDefault();
-
-                    const deltaX = e.touches[0].clientX - lastCenter.x;
-                    const deltaY = e.touches[0].clientY - lastCenter.y;
-
-                    translateX += deltaX;
-                    translateY += deltaY;
-
-                    constrainTranslate();
-                    updateTransform();
-
-                    lastCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                }
-            }, { passive: false });
-
-            container.addEventListener('touchend', function(e) {
-                if (e.touches.length < 2) {
-                    isPinching = false;
-                }
-
-                // Reset to 1.0 if zoomed out too far
-                if (scale < 1.0) {
-                    scale = 1.0;
-                    translateX = 0;
-                    translateY = 0;
-                    updateTransform();
-                }
-            }, { passive: false });
+              document.getElementById('view').onload = function () {
+                window.ReactNativeWebView.postMessage('frame');
+              };
             </script>
         </body>
         </html>
         `,
-      }}
-      onMessage={handleMessage}
-      style={StyleSheet.absoluteFill}
-      scrollEnabled={false}
-      bounces={false}
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
-    />
+          }}
+          onMessage={handleMessage}
+          style={StyleSheet.absoluteFill}
+          scrollEnabled={false}
+          bounces={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          pointerEvents="none"
+          testID="webview"
+        />
+      </Animated.View>
+      {/* Transparent overlay so WKWebView cannot steal pinch/pan touches */}
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={StyleSheet.absoluteFill}
+          testID="camera-stream-gestures"
+        />
+      </GestureDetector>
+    </View>
   );
 }

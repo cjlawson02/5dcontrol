@@ -1,6 +1,8 @@
 import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect } from "react";
+import { StyleSheet } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import ConnectionPage from "../components/ConnectionPage";
 import {
   WebSocketProvider,
@@ -26,10 +28,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SettingsProvider>
-      <WebSocketProvider>
-        <LayoutContent />
-      </WebSocketProvider>
-    </SettingsProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SettingsProvider>
+        <WebSocketProvider>
+          <LayoutContent />
+        </WebSocketProvider>
+      </SettingsProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

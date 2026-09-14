@@ -12,13 +12,36 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 // Mock expo-haptics
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
+  notificationAsync: jest.fn(),
   ImpactFeedbackStyle: {
     Light: "light",
     Medium: "medium",
     Heavy: "heavy",
   },
+  NotificationFeedbackType: {
+    Success: "success",
+    Warning: "warning",
+    Error: "error",
+  },
 }));
 
+// Mock expo-glass-effect (iOS liquid glass; View fallback in unit tests)
+jest.mock("expo-glass-effect", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return {
+    GlassView: ({ children, ...props }) =>
+      React.createElement(View, { testID: "glass-view", ...props }, children),
+    GlassContainer: ({ children, ...props }) =>
+      React.createElement(
+        View,
+        { testID: "glass-container", ...props },
+        children
+      ),
+    isLiquidGlassAvailable: () => false,
+    isGlassEffectAPIAvailable: () => false,
+  };
+});
 // Mock expo-screen-orientation
 jest.mock("expo-screen-orientation", () => ({
   lockAsync: jest.fn(),
