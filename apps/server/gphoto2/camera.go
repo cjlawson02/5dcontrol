@@ -22,6 +22,16 @@ import (
 
 type Camera C.Camera
 type CameraCaptureType int
+type CameraEventType int
+
+const (
+	EventUnknown         CameraEventType = C.GP_EVENT_UNKNOWN
+	EventTimeout         CameraEventType = C.GP_EVENT_TIMEOUT
+	EventFileAdded       CameraEventType = C.GP_EVENT_FILE_ADDED
+	EventFolderAdded     CameraEventType = C.GP_EVENT_FOLDER_ADDED
+	EventCaptureComplete CameraEventType = C.GP_EVENT_CAPTURE_COMPLETE
+	EventFileChanged     CameraEventType = C.GP_EVENT_FILE_CHANGED
+)
 
 func NewCamera() (*Camera, error) {
 	var _cam *C.Camera
@@ -141,4 +151,51 @@ func (camera *Camera) GetConfigValueString(key string, ctx *Context) (string, er
 	}
 
 	return "", fmt.Errorf("unable to get widget value")
+}
+
+// WaitEvent waits for a camera event with timeout in milliseconds
+// Returns the event type and event data (can be nil)
+func (camera *Camera) WaitEvent(timeoutMs int, ctx *Context) (CameraEventType, any, error) {
+	var eventType C.CameraEventType
+	var eventData unsafe.Pointer
+
+	if r := C.gp_camera_wait_for_event(camera.c(), C.int(timeoutMs), &eventType, &eventData, ctx.c()); r < C.GP_OK {
+		return C.GP_EVENT_UNKNOWN, nil, e(r)
+	}
+
+	// Convert C event type to Go event type
+	goEventType := CameraEventType(eventType)
+
+	// Parse event data based on type
+	var goEventData any
+	switch goEventType {
+	case C.GP_EVENT_FILE_ADDED, C.GP_EVENT_FOLDER_ADDED, C.GP_EVENT_FILE_CHANGED:
+		// Event data is a CameraFilePath pointer
+		if eventData != nil {
+			path := (*C.CameraFilePath)(eventData)
+			goEventData = map[string]string{
+				"folder": C.GoString(&path.folder[0]),
+				"name":   C.GoString(&path.name[0]),
+			}
+			// Free the event data allocated by libgphoto2
+			C.free(eventData)
+		}
+	case C.GP_EVENT_UNKNOWN:
+		// Event data might be a string
+		if eventData != nil {
+			goEventData = C.GoString((*C.char)(eventData))
+			C.free(eventData)
+		}
+	case C.GP_EVENT_TIMEOUT, C.GP_EVENT_CAPTURE_COMPLETE:
+		// No event data for these types
+		goEventData = nil
+	}
+
+	return goEventType, goEventData, nil
+}
+
+// Helper method to make WaitEvent easier to use in loops
+func (camera *Camera) WaitEventTimeout(timeoutMs int, ctx *Context) (CameraEventType, error) {
+	eventType, _, err := camera.WaitEvent(timeoutMs, ctx)
+	return eventType, err
 }

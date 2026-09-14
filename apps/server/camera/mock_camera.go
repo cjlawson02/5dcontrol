@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"log"
+	"sync"
 	"time"
 
 	"golang.org/x/image/font"
@@ -18,25 +19,19 @@ type mockCameraDevice struct {
 	frameCount int
 }
 
-// newMockCameraDevice creates a new mock camera device instance
 func newMockCameraDevice() *mockCameraDevice {
-	return &mockCameraDevice{
-		frameCount: 0,
-	}
+	return &mockCameraDevice{frameCount: 0}
 }
 
 // GenerateFrame creates a synthetic preview frame
 func (m *mockCameraDevice) GenerateFrame() ([]byte, error) {
 	m.frameCount++
 
-	// Create a 1920x1080 image
 	width, height := 1920, 1080
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	// Create a gradient background
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			// Create a subtle animated gradient
 			r := uint8((x + m.frameCount) % 256)
 			g := uint8((y + m.frameCount/2) % 256)
 			b := uint8(((x + y + m.frameCount) / 2) % 256)
@@ -44,30 +39,23 @@ func (m *mockCameraDevice) GenerateFrame() ([]byte, error) {
 		}
 	}
 
-	// Draw large text overlays
 	addLabel(img, width/2-300, height/2-50, "DEMO MODE")
 	addLabel(img, width/2-200, height/2+50, "Mock Camera")
 	addLabel(img, width/2-150, height/2+150, time.Now().Format("15:04:05"))
 
-	// Encode to JPEG
 	buf := new(bytes.Buffer)
 	if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: 85}); err != nil {
 		return nil, err
 	}
-
 	return buf.Bytes(), nil
 }
 
-// addLabel adds text to an image
 func addLabel(img *image.RGBA, x, y int, label string) {
-	// Draw each character scaled up
-	scale := 8 // Scale factor for larger text
+	scale := 8
 	charWidth := 7 * scale
-
 	point := fixed.Point26_6{X: fixed.I(0), Y: fixed.I(13)}
 
 	for i, char := range label {
-		// Create a small image for the character
 		charImg := image.NewRGBA(image.Rect(0, 0, 7, 13))
 		d := &font.Drawer{
 			Dst:  charImg,
@@ -77,12 +65,10 @@ func addLabel(img *image.RGBA, x, y int, label string) {
 		}
 		d.DrawString(string(char))
 
-		// Scale up and draw to main image
 		offsetX := x + i*charWidth
 		for sy := 0; sy < 13; sy++ {
 			for sx := 0; sx < 7; sx++ {
 				if charImg.At(sx, sy) != (color.RGBA{0, 0, 0, 0}) {
-					// Draw scaled pixel
 					for dy := 0; dy < scale; dy++ {
 						for dx := 0; dx < scale; dx++ {
 							px := offsetX + sx*scale + dx
@@ -98,29 +84,54 @@ func addLabel(img *image.RGBA, x, y int, label string) {
 	}
 }
 
-// MockCamera wraps a regular RealCamera to use mock camera
+// MockCamera wraps RealCamera for demo/testing without hardware.
 type MockCamera struct {
 	*RealCamera
-	mockCam *mockCameraDevice
+	mockCam         *mockCameraDevice
+	settingsMu      sync.Mutex
+	currentSettings CameraSettings
+	// Simulated delay between Capture() return and a "file-added" event.
+	// Used by completion bench in demo mode to show A vs B differences.
+	simulatedEventLag time.Duration
 }
 
-// Compile-time check to ensure MockCamera implements CameraController
 var _ CameraController = (*MockCamera)(nil)
+var _ SettingsController = (*MockCamera)(nil)
 
 // NewMockCamera creates a camera controller that uses mock camera
 func NewMockCamera() *MockCamera {
 	return &MockCamera{
 		RealCamera: NewRealCamera(),
 		mockCam:    newMockCameraDevice(),
+		currentSettings: CameraSettings{
+			ShutterSpeed:         "1/125",
+			Aperture:             "f/5.6",
+			ISO:                  "400",
+			ExposureCompensation: "0",
+			AutoExposureMode:     "Manual",
+		},
+		simulatedEventLag: 200 * time.Millisecond,
 	}
 }
 
-// Connect simulates camera connection
+// Connect simulates camera connection and sets up the exclusive worker path.
 func (m *MockCamera) Connect() error {
 	log.Println("Mock camera: Simulating connection...")
-	m.isConnected.Store(true)
+	m.stateMachine = &StateMachine{}
+	cmdCh := make(chan cameraCommand, 8)
+	m.commandChannel = cmdCh
+	m.previewManager = NewPreviewManager()
 	m.captureQuit = make(chan struct{})
 	m.disconnectedCh = make(chan struct{})
+	m.batteryLevel.Store(85)
+	m.shuttingDown.Store(false)
+	m.closeOnce = sync.Once{}
+	m.workerWG.Add(1)
+	go func(ch chan cameraCommand) {
+		defer m.workerWG.Done()
+		cameraWorker(ch)
+	}(cmdCh)
+	m.isConnected.Store(true)
 	return nil
 }
 
@@ -130,22 +141,35 @@ func (m *MockCamera) RunMockCaptureLoop() {
 
 	var frameCount int
 	var start = time.Now()
-
-	ticker := time.NewTicker(33 * time.Millisecond) // ~30fps
+	ticker := time.NewTicker(33 * time.Millisecond)
 	defer ticker.Stop()
 
-	for m.capturing.Load() {
+	for m.capturing.Load() && !m.shuttingDown.Load() {
 		select {
 		case <-m.captureQuit:
 			log.Println("Mock camera: Capture loop stopped")
 			return
-		case pause := <-m.pausePreview:
-			if pause {
-				log.Println("Mock camera: Preview paused")
-				<-m.pausePreview // wait for resume
-				log.Println("Mock camera: Preview resumed")
-			}
 		case <-ticker.C:
+			if m.previewManager != nil {
+				select {
+				case <-m.captureQuit:
+					return
+				case <-m.previewManager.pauseChannel:
+					log.Println("Mock camera: Preview paused")
+					select {
+					case <-m.captureQuit:
+						return
+					case <-m.previewManager.resumeChannel:
+						log.Println("Mock camera: Preview resumed")
+					}
+					continue
+				default:
+				}
+			}
+			if m.previewPaused.Load() {
+				continue
+			}
+
 			data, err := m.mockCam.GenerateFrame()
 			if err != nil {
 				log.Printf("Mock camera: Failed to generate frame: %v", err)
@@ -153,15 +177,12 @@ func (m *MockCamera) RunMockCaptureLoop() {
 			}
 
 			frame := framePool.Get().(*Frame)
-
-			// reuse buffer if capacity is enough
 			if cap(frame.Data) < len(data) {
 				frame.Data = make([]byte, len(data))
 			} else {
 				frame.Data = frame.Data[:len(data)]
 			}
 			copy(frame.Data, data)
-
 			frame.Timestamp = time.Now()
 
 			old := m.LatestFrame.Swap(frame)
@@ -182,42 +203,155 @@ func (m *MockCamera) RunMockCaptureLoop() {
 
 // AddClient starts the mock capture loop when first client connects
 func (m *MockCamera) AddClient(id string) {
-	if !m.isConnected.Load() {
+	if !m.isConnected.Load() || m.shuttingDown.Load() {
 		return
 	}
-
 	if _, loaded := m.clients.LoadOrStore(id, struct{}{}); !loaded {
-		// First client - start mock capture
 		if !m.capturing.Swap(true) {
 			m.captureQuit = make(chan struct{})
-			go m.RunMockCaptureLoop()
+			m.previewWG.Add(1)
+			go func() {
+				defer m.previewWG.Done()
+				m.RunMockCaptureLoop()
+			}()
 		}
 	}
 }
 
-// CaptureImage simulates taking a photo
-func (m *MockCamera) CaptureImage() error {
-	if !m.isConnected.Load() {
-		return nil
+// CaptureImage simulates capture with instrumented completion modes.
+// It models Capture() returning before a delayed "file-added" so demo benches
+// can show differences between A / B / hybrid.
+func (m *MockCamera) CaptureImage() (*OperationResult, error) {
+	if m.stateMachine == nil || !m.isConnected.Load() {
+		// disconnected: no-op success for tests that call before Connect
+		return &OperationResult{
+			Type:     OperationCapture,
+			Status:   OperationStatusSuccess,
+			Duration: 0,
+		}, nil
+	}
+	if err := m.stateMachine.StartOperation(OperationCapture, m.previewManager); err != nil {
+		return nil, err
 	}
 
-	log.Println("Mock camera: Simulating capture...")
+	start := time.Now()
+	opID := m.stateMachine.ActiveOpID()
+	timing := &CaptureTiming{Mode: m.completionMode}
 
-	// Pause preview briefly
-	select {
-	case m.pausePreview <- true:
-	default:
-	}
-
-	// Simulate capture delay
+	// Simulate shutter / Capture() blocking work.
 	time.Sleep(100 * time.Millisecond)
+	timing.CommandReturnAt = time.Since(start)
 
-	// Resume preview
-	select {
-	case m.pausePreview <- false:
-	default:
+	lag := m.simulatedEventLag
+	if lag < 0 {
+		lag = 0
 	}
 
-	log.Println("Mock camera: Capture complete!")
-	return nil
+	switch m.completionMode {
+	case CompletionCommandReturn:
+		// Done at command return; event would arrive later (not waited).
+		timing.DoneAt = time.Since(start)
+		timing.Success = true
+	case CompletionWaitEvent:
+		time.Sleep(lag)
+		timing.FirstUsefulEventAt = time.Since(start)
+		timing.FirstUsefulEvent = "file-added"
+		timing.EventsSeen = []string{"file-added"}
+		timing.DoneAt = time.Since(start)
+		timing.Success = true
+	case CompletionHybrid:
+		time.Sleep(lag)
+		timing.FirstUsefulEventAt = time.Since(start)
+		timing.FirstUsefulEvent = "file-added"
+		timing.EventsSeen = []string{"file-added", "capture-complete"}
+		timing.DoneAt = time.Since(start)
+		timing.Success = true
+	}
+
+	m.stateMachine.CompleteOperation()
+	if m.previewManager != nil {
+		m.previewManager.resumePreview()
+	}
+
+	log.Printf("Mock camera: Capture complete (mode=%s done=%s)", m.completionMode, timing.DoneAt)
+	return &OperationResult{
+		OperationID: opID,
+		Type:        OperationCapture,
+		Status:      OperationStatusSuccess,
+		Duration:    timing.DoneAt,
+		Timing:      timing,
+	}, nil
+}
+
+// TriggerFocus simulates triggering autofocus
+func (m *MockCamera) TriggerFocus() (*OperationResult, error) {
+	if m.stateMachine == nil || !m.isConnected.Load() {
+		return &OperationResult{Type: OperationFocus, Status: OperationStatusSuccess}, nil
+	}
+	return m.runExclusive(OperationFocus, func() (any, error) {
+		time.Sleep(50 * time.Millisecond)
+		log.Println("Mock camera: Triggering autofocus")
+		return nil, nil
+	})
+}
+
+func (m *MockCamera) GetCurrentSettings() (*CameraSettings, error) {
+	m.settingsMu.Lock()
+	defer m.settingsMu.Unlock()
+	cp := m.currentSettings
+	return &cp, nil
+}
+
+func (m *MockCamera) GetAvailableSettings() (*AvailableSettings, error) {
+	return &AvailableSettings{
+		ShutterSpeeds:         []string{"1/60", "1/125", "1/250", "1/500"},
+		Apertures:             []string{"f/2.8", "f/4", "f/5.6", "f/8"},
+		ISOs:                  []string{"100", "200", "400", "800"},
+		ExposureCompensations: []string{"-1", "0", "+1"},
+		AutoExposureModes:     []string{"Manual", "Av", "Tv", "P"},
+	}, nil
+}
+
+func (m *MockCamera) SetShutterSpeed(value string) error {
+	_, err := m.runExclusive(OperationSettings, func() (any, error) {
+		m.settingsMu.Lock()
+		m.currentSettings.ShutterSpeed = value
+		m.settingsMu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		return nil, nil
+	})
+	return err
+}
+
+func (m *MockCamera) SetAperture(value string) error {
+	_, err := m.runExclusive(OperationSettings, func() (any, error) {
+		m.settingsMu.Lock()
+		m.currentSettings.Aperture = value
+		m.settingsMu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		return nil, nil
+	})
+	return err
+}
+
+func (m *MockCamera) SetISO(value string) error {
+	_, err := m.runExclusive(OperationSettings, func() (any, error) {
+		m.settingsMu.Lock()
+		m.currentSettings.ISO = value
+		m.settingsMu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		return nil, nil
+	})
+	return err
+}
+
+func (m *MockCamera) SetExposureCompensation(value string) error {
+	_, err := m.runExclusive(OperationSettings, func() (any, error) {
+		m.settingsMu.Lock()
+		m.currentSettings.ExposureCompensation = value
+		m.settingsMu.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		return nil, nil
+	})
+	return err
 }

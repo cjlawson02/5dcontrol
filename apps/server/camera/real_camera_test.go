@@ -4,6 +4,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewRealCamera(t *testing.T) {
@@ -25,8 +27,9 @@ func TestNewRealCamera(t *testing.T) {
 		t.Error("Expected disconnectedCh to be initialized")
 	}
 
-	if manager.pausePreview == nil {
-		t.Error("Expected pausePreview to be initialized")
+	// previewPaused is an atomic.Bool, no need to check for nil
+	if manager.previewPaused.Load() {
+		t.Error("Expected preview to not be paused initially")
 	}
 }
 
@@ -171,37 +174,28 @@ func TestRealCamera_RemoveClient(t *testing.T) {
 }
 
 func TestRealCamera_CaptureImage(t *testing.T) {
-	manager := NewRealCamera()
-
-	// Try to capture when disconnected - should return error
-	err := manager.CaptureImage()
-	if err == nil {
-		t.Error("Expected error when capturing while disconnected")
+	cam := NewMockCamera()
+	if err := cam.Connect(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Connect camera
-	manager.isConnected.Store(true)
+	_, err := cam.CaptureImage()
+	assert.NoError(t, err, "CaptureImage should not return an error with a mock camera")
+}
 
-	// Capture should succeed (though it won't actually capture without real camera)
-	// We can't test the actual capture without mocking gphoto2
-	// This test mainly verifies the connection check
+func TestRealCamera_CaptureImage_NotConnected(t *testing.T) {
+	cam := NewRealCamera()
+	_, err := cam.CaptureImage()
+	assert.Error(t, err, "CaptureImage should return an error if the camera is not connected")
 }
 
 func TestRealCamera_TriggerFocus(t *testing.T) {
 	manager := NewRealCamera()
 
-	// Try to focus when disconnected - should return error
-	err := manager.TriggerFocus()
+	_, err := manager.TriggerFocus()
 	if err == nil {
 		t.Error("Expected error when focusing while disconnected")
 	}
-
-	// Connect camera
-	manager.isConnected.Store(true)
-
-	// Focus should succeed (though it won't actually focus without real camera)
-	// We can't test the actual focus without mocking gphoto2
-	// This test mainly verifies the connection check
 }
 
 func TestRealCamera_DisconnectedCh(t *testing.T) {
@@ -222,42 +216,33 @@ func TestRealCamera_DisconnectedCh(t *testing.T) {
 func TestRealCamera_handleDisconnect(t *testing.T) {
 	manager := NewRealCamera()
 	manager.isConnected.Store(true)
+	manager.disconnectedCh = make(chan struct{})
 
 	// Set up some state
 	manager.batteryQuit = make(chan struct{})
 	testFrame := &Frame{Data: []byte("test"), Timestamp: time.Now()}
 	manager.LatestFrame.Store(testFrame)
 
-	// Handle disconnect
+	// Handle disconnect (async Close)
 	manager.handleDisconnect()
 
-	// Check that camera is disconnected
+	select {
+	case <-manager.DisconnectedCh():
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for disconnect")
+	}
+
 	if manager.IsConnected() {
 		t.Error("Expected camera to be disconnected")
 	}
 
-	// Check that battery quit channel was closed
 	if manager.batteryQuit != nil {
-		select {
-		case <-manager.batteryQuit:
-			// Expected
-		default:
-			t.Error("Expected battery quit channel to be closed")
-		}
+		t.Error("Expected battery quit channel to be cleared")
 	}
 
-	// Check that latest frame was cleared
 	frame := manager.GetLatestFrame()
 	if frame != nil {
 		t.Error("Expected latest frame to be cleared")
-	}
-
-	// Check that disconnected channel was closed
-	select {
-	case <-manager.disconnectedCh:
-		// Expected
-	default:
-		t.Error("Expected disconnected channel to be closed")
 	}
 }
 
@@ -300,7 +285,7 @@ func TestRealCamera_ConcurrentAccess(t *testing.T) {
 
 	// Check that all clients were added
 	clientCount := 0
-	manager.clients.Range(func(key, value interface{}) bool {
+	manager.clients.Range(func(key, value any) bool {
 		clientCount++
 		return true
 	})
@@ -322,7 +307,7 @@ func TestRealCamera_ConcurrentAccess(t *testing.T) {
 
 	// Check that all clients were removed
 	clientCount = 0
-	manager.clients.Range(func(key, value interface{}) bool {
+	manager.clients.Range(func(key, value any) bool {
 		clientCount++
 		return true
 	})

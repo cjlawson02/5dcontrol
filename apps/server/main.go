@@ -3,7 +3,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/cjlawson02/5dcontrol/server/camera"
@@ -12,47 +14,41 @@ import (
 )
 
 func main() {
-	// Parse command line flags
 	demoMode := flag.Bool("demo", false, "Run in demo mode with mock camera")
+	benchCompletion := flag.Bool("bench-completion", false, "Compare capture completion modes (A/B/hybrid) then exit")
+	benchIters := flag.Int("bench-iters", 3, "Iterations per completion mode")
 	flag.Parse()
 
-	// start mDNS discovery
+	if *benchCompletion {
+		runCompletionBench(*demoMode, *benchIters)
+		return
+	}
+
 	go discovery.RunMDNSDiscovery()
 
-	// create initial camera controller and update channel
 	camCh := make(chan camera.CameraController)
 
 	if *demoMode {
 		log.Println("Starting in DEMO MODE with mock camera")
 		mockCam := camera.NewMockCamera()
 
-		// start HTTP MJPEG + snapshot server (no updates channel in demo mode)
 		go server.RunHTTPServer(mockCam, nil)
-
-		// start WebSocket control server (no updates channel in demo mode)
 		go server.RunWebSocketServer(mockCam, nil)
 
-		// Auto-connect mock camera
 		go func() {
 			if err := mockCam.Connect(); err != nil {
 				log.Fatalf("Failed to start mock camera: %v", err)
 			}
 			log.Println("Mock camera connected!")
-
-			// Mock camera runs forever (no need to send updates)
 			select {}
 		}()
 	} else {
 		log.Println("Starting with real camera")
 		cam := camera.NewRealCamera()
 
-		// start HTTP MJPEG + snapshot server
 		go server.RunHTTPServer(cam, camCh)
-
-		// start WebSocket control server
 		go server.RunWebSocketServer(cam, camCh)
 
-		// handle camera connection in background
 		go func() {
 			for {
 				if err := cam.Connect(); err != nil {
@@ -63,15 +59,39 @@ func main() {
 				}
 				log.Println("Camera connected!")
 
-				camCh <- cam // notify servers of connected camera
+				camCh <- cam
 
-				// wait for disconnection
 				<-cam.DisconnectedCh()
 				log.Println("Camera disconnected")
 			}
 		}()
 	}
 
-	// block forever
 	select {}
+}
+
+func runCompletionBench(demo bool, iters int) {
+	cfg := camera.DefaultBenchConfig()
+	cfg.Iterations = iters
+
+	var report camera.BenchReport
+	var err error
+
+	if demo {
+		log.Println("Running completion bench against MOCK camera (simulated event lag)")
+		mock := camera.NewMockCamera()
+		report, err = camera.RunCompletionBench(mock, cfg)
+		mock.Close()
+	} else {
+		log.Println("Running completion bench against REAL camera")
+		cam := camera.NewRealCamera()
+		report, err = camera.RunCompletionBench(cam, cfg)
+		cam.Close()
+	}
+
+	if err != nil {
+		log.Fatalf("bench failed: %v", err)
+	}
+
+	fmt.Fprint(os.Stdout, report.Format())
 }

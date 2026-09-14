@@ -10,13 +10,24 @@ type CameraController interface {
 	GetBatteryLevel() uint8
 
 	// Camera operations
-	TriggerFocus() error
-	CaptureImage() error
+	TriggerFocus() (*OperationResult, error)
+	CaptureImage() (*OperationResult, error)
 
 	// Client management for live preview streaming
 	AddClient(id string)
 	RemoveClient(id string)
 	GetLatestFrame() *Frame
+}
+
+// SettingsController is optional: settings that touch camera hardware.
+// Real and mock cameras implement this; wire through the same busy/worker path.
+type SettingsController interface {
+	GetCurrentSettings() (*CameraSettings, error)
+	GetAvailableSettings() (*AvailableSettings, error)
+	SetShutterSpeed(value string) error
+	SetAperture(value string) error
+	SetISO(value string) error
+	SetExposureCompensation(value string) error
 }
 
 // Frame represents a single preview frame from the camera

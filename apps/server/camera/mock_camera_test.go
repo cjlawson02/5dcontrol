@@ -154,19 +154,45 @@ func TestMockCamera_CaptureImage(t *testing.T) {
 	mockManager := NewMockCamera()
 
 	// Capture when disconnected - should not error
-	err := mockManager.CaptureImage()
+	_, err := mockManager.CaptureImage()
 	if err != nil {
 		t.Errorf("CaptureImage() failed when disconnected: %v", err)
 	}
 
 	// Connect camera
-	mockManager.isConnected.Store(true)
+	if err := mockManager.Connect(); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
 
 	// Capture should succeed
-	err = mockManager.CaptureImage()
+	res, err := mockManager.CaptureImage()
 	if err != nil {
 		t.Errorf("CaptureImage() failed: %v", err)
 	}
+	if res == nil || res.Timing == nil {
+		t.Errorf("expected timing on capture result")
+	}
+}
+
+func TestMockCamera_PauseResume(t *testing.T) {
+	mockManager := NewMockCamera()
+	if err := mockManager.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	mockManager.capturing.Store(true)
+	mockManager.captureQuit = make(chan struct{})
+	go mockManager.RunMockCaptureLoop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mockManager.previewManager.pausePreview()
+	time.Sleep(50 * time.Millisecond)
+	mockManager.previewManager.resumePreview()
+
+	time.Sleep(50 * time.Millisecond)
+
+	close(mockManager.captureQuit)
+	mockManager.capturing.Store(false)
 }
 
 func TestMockCamera_RunMockCaptureLoop(t *testing.T) {
@@ -179,12 +205,18 @@ func TestMockCamera_RunMockCaptureLoop(t *testing.T) {
 	go mockManager.RunMockCaptureLoop()
 
 	// Wait a bit for frames to be generated
-	time.Sleep(100 * time.Millisecond)
+	// Poll for a short period to see if a frame is generated
+	var frame *Frame
+	for range 10 {
+		frame = mockManager.GetLatestFrame()
+		if frame != nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 
-	// Check that frames are being generated
-	frame := mockManager.GetLatestFrame()
 	if frame == nil {
-		t.Error("Expected frames to be generated")
+		t.Error("Expected frames to be generated, but got none")
 	}
 
 	// Stop capture loop
@@ -192,35 +224,6 @@ func TestMockCamera_RunMockCaptureLoop(t *testing.T) {
 
 	// Wait for loop to stop
 	time.Sleep(50 * time.Millisecond)
-}
-
-func TestMockCamera_PauseResume(t *testing.T) {
-	mockManager := NewMockCamera()
-	mockManager.isConnected.Store(true)
-	mockManager.capturing.Store(true)
-	mockManager.captureQuit = make(chan struct{})
-	mockManager.pausePreview = make(chan bool, 2)
-
-	// Start capture loop in goroutine
-	go mockManager.RunMockCaptureLoop()
-
-	// Wait for initial frame
-	time.Sleep(50 * time.Millisecond)
-
-	// Pause preview
-	mockManager.pausePreview <- true
-
-	// Wait a bit
-	time.Sleep(50 * time.Millisecond)
-
-	// Resume preview
-	mockManager.pausePreview <- false
-
-	// Wait for more frames
-	time.Sleep(50 * time.Millisecond)
-
-	// Stop capture loop
-	close(mockManager.captureQuit)
 }
 
 func TestAddLabel(t *testing.T) {
@@ -277,7 +280,7 @@ func TestMockCamera_FrameConsistency(t *testing.T) {
 	mock := NewMockCamera()
 
 	// Generate frames and verify they're valid JPEG
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		data, err := mock.mockCam.GenerateFrame()
 		if err != nil {
 			t.Fatalf("GenerateFrame() failed on iteration %d: %v", i, err)
@@ -318,7 +321,7 @@ func TestMockCamera_ConcurrentAccess(t *testing.T) {
 
 	// Verify all clients were added
 	clientCount := 0
-	mockManager.clients.Range(func(key, value interface{}) bool {
+	mockManager.clients.Range(func(key, value any) bool {
 		clientCount++
 		return true
 	})
