@@ -42,6 +42,112 @@ jest.mock("expo-glass-effect", () => {
     isGlassEffectAPIAvailable: () => false,
   };
 });
+
+// Mock expo-file-system (new File / Directory / Paths API)
+jest.mock("expo-file-system", () => {
+  const store = new Map();
+
+  class MockFile {
+    uri;
+    name;
+    constructor(...parts) {
+      const segments = parts.map((p) =>
+        typeof p === "string" ? p.replace(/\/$/, "") : p.uri?.replace(/\/$/, "")
+      );
+      this.uri = segments.join("/") + (segments.at(-1)?.includes(".") ? "" : "");
+      // Normalize: last segment is name when it's a file path
+      const last = String(segments[segments.length - 1] ?? "");
+      this.name = last.includes("/") ? last.split("/").pop() : last;
+      if (!this.uri.startsWith("file://")) {
+        this.uri = `file://${this.uri.replace(/^\/+/, "/")}`;
+      }
+    }
+    get exists() {
+      return store.has(this.uri);
+    }
+    static async downloadFileAsync(url, destination) {
+      const dest =
+        destination instanceof MockFile
+          ? destination
+          : new MockFile(destination.uri, `download-${Date.now()}.jpg`);
+      store.set(dest.uri, { url, bytes: new Uint8Array([0xff, 0xd8, 0xff]) });
+      return dest;
+    }
+  }
+
+  class MockDirectory {
+    uri;
+    name;
+    constructor(...parts) {
+      const segments = parts.map((p) =>
+        typeof p === "string" ? p.replace(/\/$/, "") : p.uri?.replace(/\/$/, "")
+      );
+      this.uri = segments.join("/");
+      this.name = String(segments[segments.length - 1] ?? "");
+      if (!this.uri.startsWith("file://")) {
+        this.uri = `file://${this.uri.replace(/^\/+/, "/")}`;
+      }
+    }
+    get exists() {
+      return store.has(`${this.uri}/.dir`);
+    }
+    create() {
+      store.set(`${this.uri}/.dir`, true);
+    }
+    list() {
+      const prefix = `${this.uri}/`;
+      const files = [];
+      for (const key of store.keys()) {
+        if (key.startsWith(prefix) && key.endsWith(".jpg")) {
+          const name = key.slice(prefix.length);
+          if (!name.includes("/")) {
+            files.push(new MockFile(this.uri, name));
+          }
+        }
+      }
+      return files;
+    }
+  }
+
+  const Paths = {
+    document: new MockDirectory("file:///document"),
+    cache: new MockDirectory("file:///cache"),
+  };
+
+  // Reset helper for tests
+  global.__resetExpoFsStore = () => store.clear();
+  global.__expoFsStore = store;
+
+  return { File: MockFile, Directory: MockDirectory, Paths };
+});
+
+// Mock expo-image cache seeding APIs
+jest.mock("expo-image", () => {
+  const React = require("react");
+  const { Image: RNImage } = require("react-native");
+  const cache = new Map();
+
+  const ExpoImage = React.forwardRef((props, ref) =>
+    React.createElement(RNImage, { ...props, ref, testID: props.testID ?? "expo-image" })
+  );
+  ExpoImage.writeToCacheAsync = jest.fn(async (source, cacheKey) => {
+    cache.set(cacheKey, source);
+  });
+  ExpoImage.readFromCacheAsync = jest.fn(async (cacheKey) =>
+    cache.has(cacheKey) ? { cacheKey } : null
+  );
+  ExpoImage.displayName = "ExpoImage";
+
+  global.__resetExpoImageCache = () => {
+    cache.clear();
+    ExpoImage.writeToCacheAsync.mockClear();
+    ExpoImage.readFromCacheAsync.mockClear();
+  };
+  global.__expoImageCache = cache;
+
+  return { Image: ExpoImage };
+});
+
 // Mock expo-screen-orientation
 jest.mock("expo-screen-orientation", () => ({
   lockAsync: jest.fn(),

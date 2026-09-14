@@ -1,72 +1,55 @@
-# 5DControl - Professional Camera Remote Control 📷
+# 5DControl
 
-A powerful camera control system for Canon DSLRs using React Native (Expo) and Go, with real-time MJPEG streaming over WiFi.
+CamRanger-like **remote for a Canon EOS 5D Mark III**: Go server on a **travel router** (USB to camera, Wi‑Fi AP to phone) + **iOS** Expo client. FlatBuffers over WebSocket; HTTP for MJPEG and stills.
 
-## 🚀 Quick Start
+See [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
-### Demo Mode (No Camera Required!)
+## What works today
 
-Test all features without a physical camera. From the project root, run:
+- Manual IP connect, live MJPEG preview, focus + capture commands
+- Camera connected / battery status
+- Local grid overlays (rule of thirds, golden ratio)
+- Thin gallery: download latest `photo.jpg` into on-device cache
+- Demo mode with a mock camera (no hardware)
+
+## Quick start
+
+### Demo (no camera)
 
 ```bash
+npm install
 npm run dev:demo
 ```
 
-This starts both the server (with mock camera) and mobile app using Turbo.
+Details: [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 
-See [DEMO_MODE.md](DEMO_MODE.md) for more options and full details.
+### Real camera (dev host or travel router)
 
-### Production Mode
+1. Install libgphoto2; connect a **5D Mark III** over USB to the machine running the server.
+2. Start the server: `cd apps/server && npm run dev`
+3. Start the iOS app: `cd apps/mobile && npm run dev`
+4. Join the same LAN/AP and enter the server’s IP on the connection screen.
 
-1. Install dependencies
+| Endpoint | Default |
+| --- | --- |
+| Control WebSocket | `ws://<ip>:8888/ws` |
+| Live view | `http://<ip>:8080/live.mjpeg` |
 
-   ```bash
-   npm install
-   ```
+## Documentation
 
-2. Start the server (with real camera)
+| Doc | Description |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Doc index |
+| [docs/HLD.md](docs/HLD.md) | High-level design |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Shipped timeline + planned phases |
+| [docs/PRODUCT.md](docs/PRODUCT.md) | Vision & competitive parity |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Commands, protocol, testing |
+| [CLAUDE.md](CLAUDE.md) | Agent-oriented repo guidance |
 
-   ```bash
-   cd apps/server
-   npm run dev
-   ```
+## Repository
 
-3. Start the mobile app
-
-   ```bash
-   cd apps/mobile
-   npm run dev
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+apps/mobile      React Native (Expo) client — iOS first
+apps/server      Go + gphoto2 (runs on travel router / host)
+packages/proto   FlatBuffers schema
+```

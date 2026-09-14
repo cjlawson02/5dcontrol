@@ -237,10 +237,12 @@ export default function HomeScreen() {
 
             <Pressable
               onPress={() => {
-                logger.info("Gallery not available yet");
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/gallery");
               }}
               accessibilityRole="button"
               accessibilityLabel="Gallery"
+              testID="gallery-button"
             >
               <ViewfinderGlass
                 style={styles.navButton}

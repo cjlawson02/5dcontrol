@@ -1,166 +1,80 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI assistants working in this repository. **Product and architecture truth lives in [`docs/`](docs/).** Keep this file short and aligned with those docs—do not reintroduce aspirational features as if they shipped.
 
 ## Overview
 
-5DControl is a professional camera remote control system for Canon DSLRs using:
-- **Mobile App**: React Native (Expo) with file-based routing
-- **Server**: Go backend with WebSocket control and HTTP MJPEG streaming
-- **Protocol**: FlatBuffers for efficient binary communication
-- **Monorepo**: Turborepo with npm workspaces
+5DControl is a travel-router camera remote for a **Canon EOS 5D Mark III**:
 
-## Development Commands
+- **Mobile**: React Native (Expo), **iOS first**
+- **Server**: Go on travel router / host, WebSocket control + HTTP MJPEG/stills
+- **Protocol**: FlatBuffers (`packages/proto/control.fbs`)
+- **Monorepo**: Turborepo + npm workspaces + Go workspace (`go.work`)
 
-### Starting the Application
-
-```bash
-# Demo mode (no physical camera required)
-npm run dev:demo
-
-# Production mode (individual apps)
-cd apps/server && npm run dev    # Go server (uses air for hot reload)
-cd apps/mobile && npm run dev    # Expo mobile app
-
-# Production mode (both apps via Turbo)
-npm run dev
-```
-
-### Testing
+## Commands
 
 ```bash
-# Run all tests
+npm run dev:demo          # mock camera + mobile
+npm run dev               # turbo both apps
+cd apps/server && npm run dev
+cd apps/mobile && npm run dev
+
 npm test
+cd apps/mobile && npm run test:unit
+cd apps/server && npm test
 
-# Mobile app tests
-cd apps/mobile
-npm test                    # All tests
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests only
-npm run test:watch         # Watch mode
-npm run test:coverage      # With coverage
-
-# Server tests
-cd apps/server
-npm test                   # Equivalent to: go test ./...
-```
-
-### Building and Linting
-
-```bash
-# Build all apps (runs proto generation first)
 npm run build
-
-# Server build
-cd apps/server && npm run build  # Creates bin/server
-
-# Lint all apps
 npm run lint
-
-# Server lint
-cd apps/server && npm run lint   # Uses golangci-lint
+cd packages/proto && npm run proto
 ```
 
-### Protocol Development
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 
-When modifying the FlatBuffers schema:
+## Architecture (actual)
 
-```bash
-cd packages/proto
-npm run proto  # Regenerates Go and TypeScript code from control.fbs
-```
+1. Mobile connects to `ws://<ip>:8888/ws`
+2. Commands: FlatBuffers `FOCUS` / `CAPTURE` / `QUERY_STATUS`
+3. Status: `camera_connected`, `battery_level`
+4. Live preview: `http://<ip>:8080/live.mjpeg`
+5. Server drives camera via gphoto2 (or `-demo` mock)
 
-This creates:
-- `dist/Control/*.go` - Go types
-- `dist/control/*.ts` - TypeScript types
+Full design: [docs/HLD.md](docs/HLD.md). Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## Architecture
+### Key paths
 
-### Communication Flow
+- `apps/server/camera` — real/mock camera, operation serialization, settings helpers (settings **not** on WS yet)
+- `apps/server/server` — WS + HTTP MJPEG
+- `apps/server/gphoto2` — CGO bindings
+- `apps/server/discovery` — mDNS **advertise** only
+- `apps/mobile/components/WebSocketContext.tsx` — client WS
+- `apps/mobile/components/CameraStream.tsx` — MJPEG WebView + native pinch/pan
+- `apps/mobile/components/ViewfinderGlass.tsx` — glass HUD chrome
+- `apps/mobile/app/(tabs)/index.tsx` — viewfinder
+- `apps/mobile/app/gallery.tsx` — thin HTTP `photo.jpg` cache review
+- `apps/mobile/app/settings.tsx` — **app** grid settings (not camera exposure)
 
-1. **Mobile App** connects to server via WebSocket (`ws://<ip>:8888/ws`)
-2. **Commands** are sent from mobile as FlatBuffers messages
-3. **Server** controls camera via GPhoto2 library
-4. **Status updates** flow back via WebSocket (camera state, settings, images)
-5. **Live preview** streams via HTTP MJPEG (`http://<ip>:8888/mjpeg`)
+### Not implemented (do not invent in code comments as done)
 
-### Key Go Packages
+- Full capture→review loop (WS image-ready notify + last-capture cache on the router)
+- Camera ISO/shutter/aperture over the wire
+- Mobile mDNS browse
+- Auth / TLS
+- `CameraSettingsContext` / rich FlatBuffers image list as described in older drafts
 
-- `apps/server/camera`: Camera management and image handling
-  - `CameraManager`: Manages camera connection, preview capture, battery monitoring
-  - `ImageManager`: Handles image storage and retrieval
-  - `MockCameraManager`: Demo mode implementation
-- `apps/server/server`: Network services
-  - `ws_server.go`: WebSocket server for camera control
-  - `http_server.go`: HTTP server for MJPEG streaming and snapshots
-- `apps/server/gphoto2`: Low-level GPhoto2 bindings (CGO wrapper)
-- `apps/server/discovery`: mDNS service discovery
+**Thin gallery note:** `app/gallery.tsx` can download `http://{ip}:8080/photo.jpg` into local cache via `expo-file-system` + `expo-image` seeding — not CamRanger-class review yet.
 
-### Key Mobile Components
+## Protocol rule
 
-- `components/WebSocketContext.tsx`: WebSocket connection management
-  - Handles FlatBuffers message encoding/decoding
-  - Manages connection state and IP persistence
-  - **Note**: Currently has merge conflict markers that need resolution
-- `contexts/CameraSettingsContext.tsx`: Camera settings state (ISO, shutter, aperture)
-- `contexts/GalleryContext.tsx`: Image gallery state management
-- `app/(tabs)/index.tsx`: Main camera viewfinder screen
-- `app/gallery.tsx`: Image gallery screen
+`packages/proto/control.fbs` is the source of truth. Regenerate before relying on `dist/`. Do not restore image/settings enums from stale generated files without updating the schema and wiring both sides.
 
-### FlatBuffers Protocol
+## Testing notes
 
-The protocol is defined in `packages/proto/control.fbs` and includes:
+- Mobile: Jest + Testing Library; integration folder currently empty
+- Server: `go test ./...`; hardware tests skip without camera/network
+- Prefer demo mode for UI work
 
-- **Command types**: Focus, capture, settings changes, image operations
-- **Status messages**: Camera state, battery, current/available settings
-- **Image data**: Thumbnails and full images as byte arrays
+## Common pitfalls
 
-Messages use a tagged union pattern with `MessageType` (COMMAND or STATUS) determining which field is populated.
-
-## Repository Structure
-
-```
-apps/
-  mobile/         React Native Expo app
-    app/          File-based routes (index, settings, gallery)
-    components/   Reusable UI components
-    contexts/     React contexts for state management
-  server/         Go backend
-    camera/       Camera management logic
-    gphoto2/      GPhoto2 C library bindings
-    server/       HTTP and WebSocket servers
-    discovery/    mDNS service discovery
-packages/
-  proto/          FlatBuffers schema and generated code
-```
-
-## Go Workspace
-
-This project uses Go workspaces (`go.work`):
-- `apps/server` - main server application
-- `packages/proto` - shared protocol definitions
-
-When working with Go code, be aware that the proto package is a workspace dependency.
-
-## Testing Notes
-
-- Mobile tests use `@testing-library/react-native` and Jest
-- Go tests follow standard `_test.go` conventions
-- Integration tests in mobile use `jest.integration.config.js`
-- Mock camera available via `-demo` flag for testing without hardware
-
-## Common Issues
-
-### Server Development
-
-- The server uses `air` for hot reload during development (configured in `.air.toml`)
-- Camera operations require the GPhoto2 C library to be installed
-- Demo mode (`-demo` flag) bypasses hardware requirements
-- Binary files (`bin/`) are gitignored - rebuild after pulling changes
-
-### WebSocket Context Integration
-
-Components that need to receive data from the server (settings, images) should:
-1. Call `setOnImageListReceived`, `setOnImageDataReceived`, `setOnCurrentSettingsReceived`, or `setOnAvailableSettingsReceived` from the WebSocket context
-2. These callbacks will be invoked when the server sends corresponding data
-3. The context handles FlatBuffers parsing automatically
+- Capture/focus are largely **blocking** in gphoto2—respect the serialized camera worker; do not reintroduce fragile event-completion assumptions
+- Physical devices need the host **LAN IP**, not `127.0.0.1`
+- README must not claim missing files (demo docs live under `docs/DEMO_MODE.md`)
