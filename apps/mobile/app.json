@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cjlawson02.fivedcontrol"
+      "bundleIdentifier": "com.cjlawson02.fivedcontrol",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "5DControl looks for the camera server on your Wi‑Fi so you can connect without typing an IP address.",
+        "NSBonjourServices": ["_5dcontrol._tcp", "_5dcontrol._tcp."]
+      }
     },
     "android": {
       "package": "com.cjlawson02.fivedcontrol",
@@ -24,6 +28,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./modules/mdns-browse/app.plugin.js",
       "expo-router",
       [
         "expo-splash-screen",

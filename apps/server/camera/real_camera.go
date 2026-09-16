@@ -521,9 +521,15 @@ func eventName(t gphoto2.CameraEventType) string {
 	}
 }
 
-// TriggerFocus attempts to trigger autofocus on the camera
-func (manager *RealCamera) TriggerFocus() (*OperationResult, error) {
+// TriggerFocus attempts to trigger autofocus on the camera.
+// Positioned AF on the 5D III is best-effort: coords are logged, then the
+// existing center AF drive runs.
+func (manager *RealCamera) TriggerFocus(req FocusRequest) (*OperationResult, error) {
 	return manager.runExclusive(OperationFocus, func() (any, error) {
+		if req.HasPoint {
+			x, y := ClampFocusPoint(req.X, req.Y)
+			log.Printf("Focus point (%.3f, %.3f) received; 5D III AF-point selection is best-effort — using body AF drive", x, y)
+		}
 		if err := manager.camera.SetConfigValueString("capture", "1", manager.ctx); err != nil {
 			return nil, err
 		}

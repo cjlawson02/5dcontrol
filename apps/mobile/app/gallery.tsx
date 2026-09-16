@@ -29,7 +29,7 @@ const imageSize =
   (screenWidth - GRID_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
 
 export default function GalleryScreen() {
-  const { ip, lastImageReady } = useWebSocketContext();
+  const { ip, httpPort, lastImageReady } = useWebSocketContext();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
@@ -80,7 +80,8 @@ export default function GalleryScreen() {
         await downloadCaptureStill(
           ip,
           lastImageReady.fullPath,
-          lastImageReady.imageId
+          lastImageReady.imageId,
+          httpPort
         );
         if (!cancelled) {
           await refreshLocal();
@@ -100,7 +101,7 @@ export default function GalleryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [ip, lastImageReady, refreshLocal]);
+  }, [ip, httpPort, lastImageReady, refreshLocal]);
 
   const handleFetchLatest = async () => {
     if (!ip) {
@@ -114,10 +115,11 @@ export default function GalleryScreen() {
         await downloadCaptureStill(
           ip,
           lastImageReady.fullPath,
-          lastImageReady.imageId
+          lastImageReady.imageId,
+          httpPort
         );
       } else {
-        await downloadLatestSnapshot(ip);
+        await downloadLatestSnapshot(ip, httpPort);
       }
       await refreshLocal();
     } catch (err) {

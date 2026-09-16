@@ -20,15 +20,18 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import React, { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
+import { useMdnsBrowse } from "../hooks/useMdnsBrowse";
 import { formatIpv4Typing } from "../utils/formatIpv4";
 import { logger } from "../utils/logger";
 import { useWebSocketContext } from "./WebSocketContext";
 
 /**
  * Native iOS connection screen using SwiftUI Form / Section / TextField.
+ * Nearby `_5dcontrol._tcp` hosts are listed when Bonjour browse is available.
  */
 const ConnectionPage: React.FC = () => {
   const { status, ip, connect } = useWebSocketContext();
+  const { servers, supported, scanning, error, rescan } = useMdnsBrowse();
   const ipField = useNativeState(ip ?? "");
   const previousIp = useRef(ipField.value);
   const isLoading = status === "loading";
@@ -60,6 +63,22 @@ const ConnectionPage: React.FC = () => {
     await connect(newIp);
   };
 
+  const nearbyFooter = (() => {
+    if (!supported) {
+      return "This build cannot browse the local network (use a dev client). Enter the server IP below.";
+    }
+    if (error) {
+      return error;
+    }
+    if (scanning && servers.length === 0) {
+      return "Looking for 5DControl on this Wi‑Fi… Allow Local Network access if iOS asks.";
+    }
+    if (servers.length === 0) {
+      return "No servers found. Check Local Network permission in Settings, join the same LAN, or enter an IP below.";
+    }
+    return "Tap a server to connect. WebSocket :8888 and HTTP :8080 come from the advertisement TXT.";
+  })();
+
   return (
     <View style={styles.container} testID="connection-container">
       <Host
@@ -73,12 +92,44 @@ const ConnectionPage: React.FC = () => {
             scrollContentBackground("hidden"),
           ]}
         >
+          <Section title="Nearby servers" footer={<Text>{nearbyFooter}</Text>}>
+            {servers.map((server) => (
+              <Button
+                key={server.id}
+                label={`${server.name} (${server.host})`}
+                onPress={() => {
+                  if (isLoading) {
+                    return;
+                  }
+                  logger.info(
+                    `ConnectionPage: Connecting to discovered ${server.host}`
+                  );
+                  void connect(server.host, server.ports);
+                }}
+                modifiers={[
+                  buttonStyle("bordered"),
+                  controlSize("regular"),
+                  disabled(isLoading),
+                ]}
+              />
+            ))}
+            <Button
+              label={scanning ? "Scanning…" : "Scan again"}
+              onPress={rescan}
+              modifiers={[
+                buttonStyle("bordered"),
+                controlSize("regular"),
+                disabled(!supported || isLoading || scanning),
+              ]}
+            />
+          </Section>
+
           <Section
             title="Server Connection"
             footer={
               <Text>
-                Number pad input — periods are inserted automatically after each
-                3-digit octet.
+                Manual IP fallback — periods are inserted automatically after
+                each 3-digit octet.
               </Text>
             }
           >

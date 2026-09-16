@@ -10,16 +10,16 @@ Canonical product and engineering docs for the monorepo.
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Local setup, commands, protocol workflow, testing |
 | [DEMO_MODE.md](./DEMO_MODE.md) | Running without a physical camera |
 
-Agent-oriented working notes live in [`CLAUDE.md`](../CLAUDE.md) at the repo root and should stay aligned with these docs.
+Agent-oriented working notes live in [`AGENTS.md`](../AGENTS.md) at the repo root and should stay aligned with these docs.
 
 ## Current documentation status
 
 | Artifact | Status |
 | --- | --- |
 | Product README | Accurate quick-start (root `README.md`) |
-| HLD / Roadmap / Product | Under `docs/`; M1 capture→review + M2 exposure (sim) reflected |
-| Demo mode guide | `DEMO_MODE.md` (IMAGE_READY + exposure pill happy paths) |
-| Development guide | Endpoints, protocol, capture→review + exposure pointers |
+| HLD / Roadmap / Product | Under `docs/`; M1–M3 sim paths reflected (live bench / AF-point / enumeration still open) |
+| Demo mode guide | `DEMO_MODE.md` (IMAGE_READY + exposure pill + mDNS + tap-to-focus) |
+| Development guide | Endpoints, protocol, capture→review, exposure, discovery, tap-to-focus |
 | User manuals / supported-camera matrices | Not started |
 | API reference beyond FlatBuffers schema | Not started |
 | ADR (architecture decision records) | Not started; recommend adding when protocol expands |

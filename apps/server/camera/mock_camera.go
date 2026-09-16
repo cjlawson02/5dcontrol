@@ -310,13 +310,18 @@ func cachedID(c *CachedCapture) string {
 }
 
 // TriggerFocus simulates triggering autofocus
-func (m *MockCamera) TriggerFocus() (*OperationResult, error) {
+func (m *MockCamera) TriggerFocus(req FocusRequest) (*OperationResult, error) {
 	if m.stateMachine == nil || !m.isConnected.Load() {
 		return &OperationResult{Type: OperationFocus, Status: OperationStatusSuccess}, nil
 	}
 	return m.runExclusive(OperationFocus, func() (any, error) {
 		time.Sleep(50 * time.Millisecond)
-		log.Println("Mock camera: Triggering autofocus")
+		if req.HasPoint {
+			x, y := ClampFocusPoint(req.X, req.Y)
+			log.Printf("Mock camera: Triggering autofocus at (%.3f, %.3f)", x, y)
+		} else {
+			log.Println("Mock camera: Triggering autofocus")
+		}
 		return nil, nil
 	})
 }

@@ -192,7 +192,7 @@ func TestRealCamera_CaptureImage_NotConnected(t *testing.T) {
 func TestRealCamera_TriggerFocus(t *testing.T) {
 	manager := NewRealCamera()
 
-	_, err := manager.TriggerFocus()
+	_, err := manager.TriggerFocus(FocusRequest{})
 	if err == nil {
 		t.Error("Expected error when focusing while disconnected")
 	}

@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -14,6 +15,8 @@ const MAX_SCALE = 5;
 interface Props {
   url: string;
   onFrame?: () => void;
+  /** Viewfinder coords in the overlay's layout (not zoomed image space). */
+  onTap?: (x: number, y: number, width: number, height: number) => void;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -26,7 +29,7 @@ function maxTranslate(scale: number, size: number) {
   return Math.max(0, ((scale - 1) * size) / 2);
 }
 
-export function CameraStream({ url, onFrame }: Props) {
+export function CameraStream({ url, onFrame, onTap }: Props) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -42,6 +45,13 @@ export function CameraStream({ url, onFrame }: Props) {
       containerHeight.value = event.nativeEvent.layout.height;
     },
     [containerWidth, containerHeight]
+  );
+
+  const handleTap = useCallback(
+    (x: number, y: number, width: number, height: number) => {
+      onTap?.(x, y, width, height);
+    },
+    [onTap]
   );
 
   const pinch = Gesture.Pinch()
@@ -84,6 +94,7 @@ export function CameraStream({ url, onFrame }: Props) {
     });
 
   const pan = Gesture.Pan()
+    .minDistance(12)
     .onStart(() => {
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
@@ -125,7 +136,20 @@ export function CameraStream({ url, onFrame }: Props) {
       savedTranslateY.value = translateY.value;
     });
 
-  const gesture = Gesture.Simultaneous(pinch, pan);
+  const tap = Gesture.Tap()
+    .enabled(onTap != null)
+    .maxDuration(250)
+    .maxDistance(10)
+    .onEnd((event) => {
+      runOnJS(handleTap)(
+        event.x,
+        event.y,
+        containerWidth.value,
+        containerHeight.value
+      );
+    });
+
+  const gesture = Gesture.Simultaneous(pinch, pan, tap);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [

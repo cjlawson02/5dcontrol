@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#00ffcc",
     borderRadius: 4,
-    zIndex: 10,
+    zIndex: 50,
   },
   focusBoxCentered: {
     width: 70,

@@ -28,6 +28,9 @@ describe("galleryCache", () => {
     expect(mediaUrlForIp("10.0.0.1", "captures/9/thumb.jpg")).toBe(
       "http://10.0.0.1:8080/captures/9/thumb.jpg"
     );
+    expect(mediaUrlForIp("10.0.0.1", "/captures/9/full.jpg", 18080)).toBe(
+      "http://10.0.0.1:18080/captures/9/full.jpg"
+    );
   });
 
   it("builds stable cache keys", () => {

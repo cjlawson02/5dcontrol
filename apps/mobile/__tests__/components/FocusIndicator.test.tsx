@@ -1,3 +1,4 @@
+import { StyleSheet } from "react-native";
 import { render } from "@testing-library/react-native";
 import { FocusIndicator } from "../../components/FocusIndicator";
 
@@ -51,5 +52,13 @@ describe("FocusIndicator", () => {
       <FocusIndicator x={0} y={0} centered />
     );
     expect(getByTestId("focus-indicator")).toBeTruthy();
+  });
+
+  it("offsets the box so x/y is the center", () => {
+    const { getByTestId } = render(<FocusIndicator x={100} y={200} />);
+    const indicator = getByTestId("focus-indicator");
+    const flat = StyleSheet.flatten(indicator.props.style);
+    expect(flat.left).toBe(75);
+    expect(flat.top).toBe(175);
   });
 });

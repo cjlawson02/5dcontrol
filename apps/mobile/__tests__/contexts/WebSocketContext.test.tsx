@@ -144,6 +144,49 @@ describe("WebSocketContext", () => {
     });
   });
 
+  describe("disconnect", () => {
+    it("closes the socket and returns to disconnected", async () => {
+      const mockWebSocket = {
+        close: jest.fn(),
+        send: jest.fn(),
+        onopen: null as null | (() => void),
+        onclose: null,
+        onerror: null,
+        onmessage: null,
+      };
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
+      );
+
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.ip).toBe("192.168.1.1");
+      });
+
+      act(() => {
+        result.current.reconnect();
+      });
+      await waitFor(() => {
+        expect(mockWebSocket.onopen).toEqual(expect.any(Function));
+      });
+      act(() => {
+        mockWebSocket.onopen?.();
+      });
+      await waitFor(() => {
+        expect(result.current.status).toBe("connected");
+      });
+
+      act(() => {
+        result.current.disconnect();
+      });
+
+      expect(mockWebSocket.close).toHaveBeenCalled();
+      expect(result.current.status).toBe("disconnected");
+    });
+  });
+
   describe("sendCommand", () => {
     it("should send command when WebSocket is available", async () => {
       const mockWebSocket = {

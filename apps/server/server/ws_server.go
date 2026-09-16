@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -183,8 +184,15 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 				if msg.Command(cmd) != nil {
 					switch cmd.Type() {
 					case Proto.ControlTypeFOCUS:
-						log.Println("Focus command received")
-						if _, err := cam.TriggerFocus(); err != nil {
+						req := camera.FocusRequest{}
+						if cmd.HasFocusPoint() {
+							x, y := camera.ClampFocusPoint(cmd.FocusX(), cmd.FocusY())
+							req = camera.FocusRequest{HasPoint: true, X: x, Y: y}
+							log.Printf("Focus command received at (%.3f, %.3f)", x, y)
+						} else {
+							log.Println("Focus command received")
+						}
+						if _, err := cam.TriggerFocus(req); err != nil {
 							log.Printf("Failed to trigger focus: %v", err)
 						}
 					case Proto.ControlTypeCAPTURE:
@@ -233,7 +241,7 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 		}
 	})
 
-	addr := ":8888"
+	addr := fmt.Sprintf(":%d", WSPort)
 	log.Printf("WS server listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

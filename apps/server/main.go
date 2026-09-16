@@ -24,7 +24,12 @@ func main() {
 		return
 	}
 
-	go discovery.RunMDNSDiscovery()
+	go discovery.Run(discovery.Advertisement{
+		Instance: discovery.InstanceName,
+		HTTPPort: server.HTTPPort,
+		WSPort:   server.WSPort,
+		Version:  discovery.Version,
+	})
 
 	camCh := make(chan camera.CameraController)
 

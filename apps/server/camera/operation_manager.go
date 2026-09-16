@@ -106,7 +106,7 @@ type ActiveOperation struct {
 
 // OperationManager coordinates all camera operations
 type OperationManager interface {
-	TriggerFocus() (*OperationResult, error)
+	TriggerFocus(req FocusRequest) (*OperationResult, error)
 	CaptureImage() (*OperationResult, error)
 }
 

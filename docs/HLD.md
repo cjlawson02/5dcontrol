@@ -44,7 +44,7 @@ flowchart LR
   HTTP --> Cam
   HTTP --> Store
   Real <-->|"USB"| Camera
-  MDNS -.->|"advertise; client browse TBD"| Phone
+  MDNS -.->|"advertise _5dcontrol._tcp + TXT ports"| Phone
 ```
 
 ### Image transport decision (Expo-friendly)
@@ -77,7 +77,7 @@ flowchart LR
 **Constraints**
 
 - libgphoto2 capture/focus are largely **synchronous/blocking**; architecture must not pretend they are fully event-driven
-- Dual ports today (8080 media / 8888 control); mDNS currently advertises **8080 only**
+- Dual ports today (8080 media / 8888 control); mDNS SRV is HTTP `:8080`, TXT carries `http_port` + `ws_port`
 - **Trusted router Wi‑Fi / LAN**; no auth/TLS in v1
 - iOS-first client; Android deferred
 - Protocol schema in `packages/proto/control.fbs` is intentionally minimal; generated `dist/` must not be treated as source of truth
@@ -90,16 +90,17 @@ flowchart LR
 | Component | Responsibility |
 | --- | --- |
 | Expo Router screens | Connection gate → viewfinder → gallery → app settings |
-| `WebSocketContext` | Connect, persist IP, encode/decode FlatBuffers, surface status + `lastImageReady` + camera exposure |
-| `CameraStream` | MJPEG via WebView; pinch/pan via Gesture Handler + Reanimated overlay |
+| `WebSocketContext` | Connect, persist IP + ports, encode/decode FlatBuffers, surface status + `lastImageReady` + camera exposure |
+| `CameraStream` | MJPEG via WebView; pinch/pan via Gesture Handler + Reanimated overlay; tap for focus |
 | `ViewfinderGlass` | `expo-glass-effect` HUD chrome (status, nav, capture) |
+| `ConnectionHud` | Wifi pill → reconnect / disconnect (return to connection screen) |
 | `ExposureControls` | Bottom ISO / TV / AV readout pill + expanding value rail (camera exposure, not app settings) |
 | Viewfinder last-thumb | After `IMAGE_READY`, download still and show it as the gallery button artwork |
 | Gallery | Auto-fetch on notify; manual fetch; local `expo-file-system` / `expo-image` cache |
 | `SettingsContext` / `settings.tsx` | **App-only** overlays (grid) — not camera ISO/Tv/Av |
-| Platform UI | Expo UI / SwiftUI forms for connection + app settings |
+| Platform UI | Expo UI / SwiftUI forms for connection + app settings; Bonjour nearby-server list on iOS |
 
-**Not yet in product surface:** mDNS browse, tap-to-focus. Capture-notify and exposure settings are wired on the demo/sim path; verified under ~3s capture→thumb on travel-router Wi‑Fi with 5D III remains a live-bench exit criterion. Real gphoto2 available-choice enumeration still returns empty lists.
+**Not yet in product surface:** live 5D III AF-point selection (tap reticle + coords are wired; body still uses center AF drive). Capture-notify and exposure settings are wired on the demo/sim path; verified under ~3s capture→thumb on travel-router Wi‑Fi with 5D III remains a live-bench exit criterion. Real gphoto2 available-choice enumeration still returns empty lists.
 
 ### 3.2 Server (`apps/server`)
 
@@ -108,7 +109,7 @@ flowchart LR
 | `server/` | HTTP MJPEG + capture routes + WebSocket hub (`IMAGE_READY` + settings broadcast) |
 | `camera/` | `CameraController`, `SettingsController`, last-capture store, operation serialization, preview, mock |
 | `gphoto2/` | CGO bindings (capture path + file download) |
-| `discovery/` | mDNS registration (`_5dcontrol._tcp`) |
+| `discovery/` | mDNS advertise `_5dcontrol._tcp` (SRV = HTTP port; TXT `http_port` / `ws_port` / `version`) |
 
 Camera operations are serialized through a worker so preview and still/focus ops do not race on the USB session. After a successful capture, the server caches JPEG/thumb and notifies WS clients.
 
@@ -120,6 +121,7 @@ Current messages:
 
 - **Command:** `FOCUS`, `CAPTURE`, `QUERY_STATUS`, `QUERY_SETTINGS`, `QUERY_AVAILABLE_SETTINGS`, `SET_SETTING`
   - `SET_SETTING` carries `setting_field` (`ISO` / `SHUTTER_SPEED` / `APERTURE` / `EXPOSURE_COMPENSATION`) + `setting_value` (string)
+  - `FOCUS` may include `has_focus_point` + normalized `focus_x` / `focus_y` (0–1 viewfinder space). Demo mock logs the point. Live 5D III still runs the existing center AF drive.
 - **Status:** `camera_connected`, `battery_level`
 - **ImageReady:** `image_id`, `thumb_path`, `full_path` (HTTP paths on `:8080`; client prepends `http://{ip}:8080`)
 - **CurrentSettings:** `shutter_speed`, `aperture`, `iso`, `exposure_compensation`
@@ -137,11 +139,15 @@ Further protocol expansion must land in `.fbs` first, then regenerate Go/TS, the
 sequenceDiagram
   actor User
   participant App as Mobile app
+  participant mDNS as Bonjour
   participant WS as Server WS :8888
   participant HTTP as Server HTTP :8080
 
-  User->>App: Enter server IPv4 (persisted)
-  App->>WS: Connect ws://IP:8888/ws
+  User->>App: Open connection screen
+  App->>mDNS: Browse _5dcontrol._tcp
+  mDNS-->>App: IPv4 + TXT http_port / ws_port
+  User->>App: Tap discovered host (or enter IPv4)
+  App->>WS: Connect ws://IP:{ws_port}/ws
   WS-->>App: Status (camera_connected, battery)
   App->>WS: QUERY_SETTINGS + QUERY_AVAILABLE_SETTINGS
   WS-->>App: CURRENT_SETTINGS + AVAILABLE_SETTINGS
@@ -199,7 +205,11 @@ sequenceDiagram
 
 The control is non-modal by design: a glass pill docked in the bottom thumb zone reads out ISO / TV / AV, and tapping a segment expands a horizontal rail that snaps through that field's `AVAILABLE_SETTINGS` list. `SET_SETTING` is sent when the rail settles, so scrubbing does not flood the serialized camera worker. Exposure values are enumerated, not continuous — the rail maps one detent per choice.
 
-### 4.4 Demo mode
+### 4.4 Tap-to-focus
+
+Tapping the live view (not a pinch/pan) places `FocusIndicator` at the tap and sends `FOCUS` with normalized 0–1 coords. Long-pressing the shutter still focuses without a point (center). Demo mock acknowledges and logs the point. The 5D III USB path does not yet select an AF point on the body — it runs the existing AF drive after logging the coords.
+
+### 4.5 Demo mode
 
 `go run . -demo` substitutes `MockCamera`: synthetic MJPEG, fake battery/status, labeled stills after shutter, and mutable exposure settings with realistic available lists — so capture→gallery and ISO/Tv/Av flows work without USB.
 
@@ -219,7 +229,7 @@ flowchart TB
 
 | Concern | Current state | Direction |
 | --- | --- | --- |
-| Discovery | Server advertises; client does not browse | Add Bonjour/mDNS client; align advertised port with connection UX |
+| Discovery | Server advertises `_5dcontrol._tcp`; iOS browses (dev client). SRV = HTTP; TXT has both ports | Keep manual IP as fallback; Android browse deferred |
 | Security | Trusted router Wi‑Fi / LAN; no auth v1 | Keep trust boundary at the AP |
 | Observability | Server + mobile loggers | Structured logs + capture latency metrics |
 | Multi-client | **Single controller** (Mode A) | Reject or ignore additional control clients; Mode B viewers deferred |

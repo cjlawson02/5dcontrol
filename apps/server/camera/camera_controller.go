@@ -10,7 +10,7 @@ type CameraController interface {
 	GetBatteryLevel() uint8
 
 	// Camera operations
-	TriggerFocus() (*OperationResult, error)
+	TriggerFocus(req FocusRequest) (*OperationResult, error)
 	CaptureImage() (*OperationResult, error)
 
 	// Client management for live preview streaming
@@ -31,6 +31,31 @@ type SettingsController interface {
 	SetAperture(value string) error
 	SetISO(value string) error
 	SetExposureCompensation(value string) error
+}
+
+// FocusRequest is a tap-to-focus command. When HasPoint is false the body
+// uses its normal (center) AF drive. Normalized X/Y are 0–1 in viewfinder
+// space; the 5D III AF-point path is best-effort and currently ignored on
+// the real camera (demo mock logs the point).
+type FocusRequest struct {
+	HasPoint bool
+	X        float32
+	Y        float32
+}
+
+// ClampFocusPoint keeps normalized coords in 0–1.
+func ClampFocusPoint(x, y float32) (float32, float32) {
+	if x < 0 {
+		x = 0
+	} else if x > 1 {
+		x = 1
+	}
+	if y < 0 {
+		y = 0
+	} else if y > 1 {
+		y = 1
+	}
+	return x, y
 }
 
 // Frame represents a single preview frame from the camera

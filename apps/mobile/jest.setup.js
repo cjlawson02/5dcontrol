@@ -493,6 +493,7 @@ jest.mock("flatbuffers", () => ({
     addFieldInt16: jest.fn(),
     addFieldInt32: jest.fn(),
     addFieldInt64: jest.fn(),
+    addFieldFloat32: jest.fn(),
     addFieldOffset: jest.fn(),
     addOffset: jest.fn(),
     createString: jest.fn(() => 0),

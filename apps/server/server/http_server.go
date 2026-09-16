@@ -122,7 +122,7 @@ func RunHTTPServer(cam camera.CameraController, updates <-chan camera.CameraCont
 		writeJPEG(w, data)
 	})
 
-	addr := ":8080"
+	addr := fmt.Sprintf(":%d", HTTPPort)
 	log.Printf("HTTP server listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

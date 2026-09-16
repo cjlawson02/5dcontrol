@@ -16,10 +16,21 @@ import React, {
   useState,
 } from "react";
 import { logger } from "../utils/logger";
+import {
+  clamp01,
+  DEFAULT_HTTP_PORT,
+  DEFAULT_WS_PORT,
+  resolveServerPorts,
+  wsUrlForHost,
+  type ServerPorts,
+} from "../utils/serverEndpoints";
 
 type ConnectionStatus = "connected" | "disconnected" | "loading";
 
-/** Paths are HTTP paths on :8080; prepend http://{ip}:8080 on the client. */
+/** Normalized viewfinder coords (0–1) sent with FOCUS when the user taps. */
+export type FocusPoint = { x: number; y: number };
+
+/** Paths are HTTP paths on the media port; prepend http://{ip}:{httpPort}. */
 export type ImageReadyInfo = {
   imageId: string;
   thumbPath: string;
@@ -47,13 +58,16 @@ interface WebSocketContextValue {
   cameraStatus: ConnectionStatus;
   batteryLevel: number;
   ip: string | null;
+  wsPort: number;
+  httpPort: number;
   lastImageReady: ImageReadyInfo | null;
   currentSettings: CameraExposureSettings | null;
   availableSettings: AvailableExposureSettings | null;
   setIp: (ip: string | null) => void;
   reconnect: () => void;
-  connect: (ip: string) => Promise<void>;
-  sendCommand: (type: ControlType) => void;
+  disconnect: () => void;
+  connect: (ip: string, ports?: Partial<ServerPorts>) => Promise<void>;
+  sendCommand: (type: ControlType, focus?: FocusPoint) => void;
   setCameraSetting: (field: SettingField, value: string) => void;
   queryCameraSettings: () => void;
   loadIp?: () => Promise<void>;
@@ -64,11 +78,19 @@ const WebSocketContext = createContext<WebSocketContextValue | undefined>(
   undefined
 );
 
-const buildCommandMessage = (type: ControlType): Uint8Array => {
+const buildCommandMessage = (
+  type: ControlType,
+  focus?: FocusPoint
+): Uint8Array => {
   const builder = new Builder(64);
 
   Command.startCommand(builder);
   Command.addType(builder, type);
+  if (type === ControlType.FOCUS && focus) {
+    Command.addHasFocusPoint(builder, true);
+    Command.addFocusX(builder, clamp01(focus.x));
+    Command.addFocusY(builder, clamp01(focus.y));
+  }
   const commandOffset = Command.endCommand(builder);
 
   Message.startMessage(builder);
@@ -115,6 +137,8 @@ const readStringList = (
 };
 
 const STORAGE_KEY = "server_ip";
+const STORAGE_WS_PORT = "server_ws_port";
+const STORAGE_HTTP_PORT = "server_http_port";
 const DEFAULT_IP = "192.168.1.1";
 
 export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
@@ -122,6 +146,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const [cameraStatus, setCameraStatus] = useState<ConnectionStatus>("loading");
   const [batteryLevel, setBatteryLevel] = useState<number>(0);
   const [ip, setInternalIp] = useState<string | null>(null);
+  const [wsPort, setWsPort] = useState(DEFAULT_WS_PORT);
+  const [httpPort, setHttpPort] = useState(DEFAULT_HTTP_PORT);
   const [connectionTrigger, setConnectionTrigger] = useState(0);
   const [lastImageReady, setLastImageReady] = useState<ImageReadyInfo | null>(
     null
@@ -135,6 +161,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const setDisconnected = useCallback(() => setStatus("disconnected"), []);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const suppressDisconnectRef = useRef(false);
 
   const clearLastImageReady = useCallback(() => {
     setLastImageReady(null);
@@ -153,32 +180,75 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const persistPorts = useCallback(async (ports: ServerPorts) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_WS_PORT, String(ports.wsPort));
+      await AsyncStorage.setItem(STORAGE_HTTP_PORT, String(ports.httpPort));
+    } catch (error) {
+      logger.error(`WebSocket: Error saving ports:`, error);
+    }
+  }, []);
+
   const reconnect = useCallback(() => {
     logger.debug(`WebSocket: reconnect called`);
+    suppressDisconnectRef.current = true;
     setConnectionTrigger((prev) => prev + 1);
   }, []);
 
-  const connect = useCallback(async (targetIp: string) => {
-    logger.debug(`WebSocket: connect called with: ${targetIp}`);
-    setInternalIp(targetIp);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, targetIp);
-    } catch (error) {
-      logger.error(`WebSocket: Error saving IP to storage:`, error);
+  const disconnect = useCallback(() => {
+    logger.debug(`WebSocket: disconnect called`);
+    suppressDisconnectRef.current = false;
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
     }
-    setConnectionTrigger((prev) => prev + 1);
-  }, []);
+    setConnectionTrigger(0);
+    setDisconnected();
+    setCameraStatus("disconnected");
+    setCurrentSettings(null);
+    setAvailableSettings(null);
+  }, [setDisconnected]);
+
+  const connect = useCallback(
+    async (targetIp: string, ports?: Partial<ServerPorts>) => {
+      logger.debug(`WebSocket: connect called with: ${targetIp}`);
+      const resolved = resolveServerPorts(ports);
+      setStatus("loading");
+      suppressDisconnectRef.current = false;
+      setInternalIp(targetIp);
+      setWsPort(resolved.wsPort);
+      setHttpPort(resolved.httpPort);
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, targetIp);
+        await persistPorts(resolved);
+      } catch (error) {
+        logger.error(`WebSocket: Error saving connection:`, error);
+      }
+      setConnectionTrigger((prev) => prev + 1);
+    },
+    [persistPorts]
+  );
 
   const loadIp = useCallback(async () => {
     logger.debug(`WebSocket: Loading IP from storage`);
     try {
       const savedIp = await AsyncStorage.getItem(STORAGE_KEY);
+      const savedWs = await AsyncStorage.getItem(STORAGE_WS_PORT);
+      const savedHttp = await AsyncStorage.getItem(STORAGE_HTTP_PORT);
       logger.debug(`WebSocket: Saved IP from storage: ${savedIp}`);
       // Prefill only — do not auto-connect until the user taps Connect.
       setInternalIp(savedIp ?? DEFAULT_IP);
+      const resolved = resolveServerPorts({
+        wsPort: savedWs ? Number(savedWs) : undefined,
+        httpPort: savedHttp ? Number(savedHttp) : undefined,
+      });
+      setWsPort(resolved.wsPort);
+      setHttpPort(resolved.httpPort);
     } catch (error) {
       logger.error(`WebSocket: Error loading IP from storage:`, error);
       setInternalIp(DEFAULT_IP);
+      setWsPort(DEFAULT_WS_PORT);
+      setHttpPort(DEFAULT_HTTP_PORT);
     } finally {
       logger.debug(`WebSocket: Setting initial status to disconnected`);
       setDisconnected();
@@ -208,7 +278,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
       wsRef.current.close();
     }
 
-    const wsUrl = `ws://${ip}:8888/ws`;
+    const wsUrl = wsUrlForHost(ip, wsPort);
     logger.info(`WebSocket: Creating new connection to: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
@@ -216,6 +286,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
     ws.onopen = () => {
       logger.info(`WebSocket: Connection opened successfully to ${wsUrl}`);
+      suppressDisconnectRef.current = false;
       setConnected();
 
       logger.debug(`WebSocket: Sending QUERY_STATUS + settings queries`);
@@ -226,6 +297,9 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
     ws.onclose = (e) => {
       logger.info(`WebSocket: Connection closed:`, e.code, e.reason);
+      if (suppressDisconnectRef.current) {
+        return;
+      }
       setDisconnected();
       setCameraStatus("disconnected");
       setCurrentSettings(null);
@@ -362,11 +436,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         wsRef.current = null;
       }
     };
-  }, [ip, connectionTrigger, setConnected, setDisconnected]);
+  }, [ip, wsPort, connectionTrigger, setConnected, setDisconnected]);
 
-  const sendCommand = useCallback((type: ControlType) => {
+  const sendCommand = useCallback((type: ControlType, focus?: FocusPoint) => {
     logger.debug(`WebSocket: Sending command: ${ControlType[type]}`);
-    const msg = buildCommandMessage(type);
+    const msg = buildCommandMessage(type, focus);
     wsRef.current?.send(msg);
   }, []);
 
@@ -408,11 +482,14 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     cameraStatus,
     batteryLevel,
     ip,
+    wsPort,
+    httpPort,
     lastImageReady,
     currentSettings,
     availableSettings,
     setIp,
     reconnect,
+    disconnect,
     connect,
     sendCommand,
     setCameraSetting,

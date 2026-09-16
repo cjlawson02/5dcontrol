@@ -21,6 +21,8 @@ const mockWebSocket = {
   status: "connected" as const,
   cameraStatus: "connected" as const,
   batteryLevel: 80,
+  httpPort: 8080,
+  wsPort: 8888,
   lastImageReady: null as null | {
     imageId: string;
     thumbPath: string;
@@ -29,6 +31,7 @@ const mockWebSocket = {
   },
   setIp: jest.fn(),
   reconnect: jest.fn(),
+  disconnect: jest.fn(),
   connect: jest.fn(),
   sendCommand: jest.fn(),
   clearLastImageReady: jest.fn(),
@@ -102,7 +105,8 @@ describe("GalleryScreen", () => {
 
     await waitFor(() => {
       expect(galleryCache.downloadLatestSnapshot).toHaveBeenCalledWith(
-        "192.168.1.1"
+        "192.168.1.1",
+        8080
       );
       expect(getByTestId("gallery-list")).toBeTruthy();
       expect(queryByTestId("gallery-empty")).toBeNull();

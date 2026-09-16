@@ -1,5 +1,5 @@
 import { ControlType } from "@5dcontrol/proto";
-import { Column, Host, Text } from "@expo/ui";
+import { Button, Column, Host, Text } from "@expo/ui";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -21,6 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraStream } from "../../components/CameraStream";
+import { ConnectionHud } from "../../components/ConnectionHud";
 import { ExposureControls } from "../../components/ExposureControls";
 import { FocusIndicator } from "../../components/FocusIndicator";
 import { GridOverlay } from "../../components/GridOverlay";
@@ -36,9 +37,15 @@ import {
   mediaUrlForIp,
 } from "../../utils/galleryCache";
 import { logger } from "../../utils/logger";
+import { liveViewUrlForHost } from "../../utils/serverEndpoints";
 
 export default function HomeScreen() {
   const [focusActive, setFocusActive] = useState(false);
+  const [focusTarget, setFocusTarget] = useState<{
+    x: number;
+    y: number;
+    centered: boolean;
+  } | null>(null);
   const [lastThumb, setLastThumb] = useState<GalleryImage | null>(null);
   const frameTimes = useRef<number[]>([]);
   const flashOpacity = useSharedValue(0);
@@ -54,6 +61,9 @@ export default function HomeScreen() {
     currentSettings,
     availableSettings,
     setCameraSetting,
+    reconnect,
+    disconnect,
+    httpPort,
   } = useWebSocketContext();
   const { state: settings } = useSettings();
 
@@ -76,7 +86,8 @@ export default function HomeScreen() {
         const image = await downloadCaptureStill(
           ip,
           lastImageReady.fullPath,
-          lastImageReady.imageId
+          lastImageReady.imageId,
+          httpPort
         );
         if (!cancelled) {
           setLastThumb(image);
@@ -87,7 +98,7 @@ export default function HomeScreen() {
           setLastThumb({
             id: lastImageReady.imageId,
             filename: `capture-${lastImageReady.imageId}.jpg`,
-            uri: mediaUrlForIp(ip, lastImageReady.thumbPath),
+            uri: mediaUrlForIp(ip, lastImageReady.thumbPath, httpPort),
             cacheKey: `remote:${lastImageReady.imageId}`,
             createdAt: Number(lastImageReady.imageId) || Date.now(),
           });
@@ -98,21 +109,54 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [ip, lastImageReady]);
+  }, [ip, httpPort, lastImageReady]);
 
   const notifyCaptureSuccess = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleFocus = () => {
+  const handleFocus = (target?: {
+    x: number;
+    y: number;
+    centered: boolean;
+    normX?: number;
+    normY?: number;
+  }) => {
     if (cameraStatus !== "connected") {
       return;
     }
 
+    const next = target ?? { x: 0, y: 0, centered: true };
+    setFocusTarget(next);
     setFocusActive(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    sendCommand(ControlType.FOCUS);
-    setTimeout(() => setFocusActive(false), 800);
+    if (next.centered || next.normX == null || next.normY == null) {
+      sendCommand(ControlType.FOCUS);
+    } else {
+      sendCommand(ControlType.FOCUS, { x: next.normX, y: next.normY });
+    }
+    setTimeout(() => {
+      setFocusActive(false);
+      setFocusTarget(null);
+    }, 800);
+  };
+
+  const handleStreamTap = (
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => {
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    handleFocus({
+      x,
+      y,
+      centered: false,
+      normX: width > 0 ? Math.min(1, Math.max(0, x / width)) : 0.5,
+      normY: height > 0 ? Math.min(1, Math.max(0, y / height)) : 0.5,
+    });
   };
 
   const handleCapture = () => {
@@ -173,12 +217,6 @@ export default function HomeScreen() {
     return "#F44336";
   };
 
-  const getConnectionColor = () => {
-    if (cameraStatus === "connected") return "#4CAF50";
-    if (status === "connected") return "#FFC107";
-    return "#F44336";
-  };
-
   return (
     <View style={styles.container}>
       {cameraStatus !== "connected" ? (
@@ -206,17 +244,32 @@ export default function HomeScreen() {
                 5DControl.
               </Text>
               <ActivityIndicator color="#fff" />
+              <Button
+                label="Reconnect"
+                onPress={() => reconnect()}
+              />
+              <Button
+                label="Change server"
+                onPress={() => disconnect()}
+              />
             </Column>
           </Host>
         </SafeAreaView>
       ) : (
         <>
           <CameraStream
-            url={`http://${ip}:8080/live.mjpeg`}
+            url={liveViewUrlForHost(ip ?? "", httpPort)}
             onFrame={handleFrame}
+            onTap={handleStreamTap}
           />
           <GridOverlay type={settings.gridType} visible={true} />
-          {focusActive ? <FocusIndicator x={0} y={0} centered /> : null}
+          {focusActive && focusTarget ? (
+            <FocusIndicator
+              x={focusTarget.x}
+              y={focusTarget.y}
+              centered={focusTarget.centered}
+            />
+          ) : null}
 
           <Animated.View
             pointerEvents="none"
@@ -224,24 +277,12 @@ export default function HomeScreen() {
           />
 
           <View style={styles.leftNav}>
-            <ViewfinderGlass
-              style={styles.connectionIndicator}
-              fallbackStyle={styles.chromeFallback}
-            >
-              <Feather name="wifi" color={getConnectionColor()} size={20} />
-              <RNText
-                style={[
-                  styles.connectionText,
-                  { color: getConnectionColor() },
-                ]}
-              >
-                {cameraStatus === "connected"
-                  ? "Camera"
-                  : status === "connected"
-                    ? "Server"
-                    : "Offline"}
-              </RNText>
-            </ViewfinderGlass>
+            <ConnectionHud
+              cameraStatus={cameraStatus}
+              serverStatus={status}
+              onReconnect={reconnect}
+              onDisconnect={disconnect}
+            />
 
             <ViewfinderGlass
               style={styles.batteryIndicator}
@@ -391,18 +432,6 @@ const styles = StyleSheet.create({
   },
   chromeFallback: {
     backgroundColor: "rgba(144, 144, 144, 0.35)",
-  },
-  connectionIndicator: {
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-  },
-  connectionText: {
-    fontSize: 12,
-    fontWeight: "600",
   },
   batteryIndicator: {
     alignItems: "center",

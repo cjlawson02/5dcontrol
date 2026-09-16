@@ -45,7 +45,7 @@ Default endpoints (server host IP):
 | Last capture (full) | `http://<ip>:8080/captures/{id}/full.jpg` (or `/captures/latest/full.jpg`) |
 | Last capture (thumb) | `http://<ip>:8080/captures/{id}/thumb.jpg` |
 
-Enter the server IPv4 on the mobile connection screen. mDNS is advertised by the server as `_5dcontrol._tcp` but the app does not browse it yet.
+Enter the server IPv4 on the mobile connection screen, or tap a discovered `_5dcontrol._tcp` host on iOS (dev client). mDNS SRV is HTTP `:8080`; TXT records `http_port`, `ws_port`, and `version` tell the client how to build `ws://…:8888/ws` and `http://…:8080/…`. Expo Go cannot browse Bonjour — use `npx expo run:ios` / a dev client so the local `mdns-browse` module is linked, and allow **Local Network** when iOS asks. Rebuild the iOS client after pulling this native module. If browse fails with `NSNetServicesErrorCode -72008`, the generated `Info.plist` is missing `_5dcontrol._tcp` in `NSBonjourServices` (stale prebuild); run `npx expo prebuild --platform ios` then `npx expo run:ios` again. Manual IP still works.
 
 ## Build & lint
 
@@ -62,7 +62,7 @@ cd packages/proto
 npm run proto    # regenerates Go + TypeScript from control.fbs
 ```
 
-**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema: FOCUS / CAPTURE / QUERY_STATUS / QUERY_SETTINGS / QUERY_AVAILABLE_SETTINGS / SET_SETTING; Status; IMAGE_READY; CURRENT_SETTINGS; AVAILABLE_SETTINGS.
+**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema: FOCUS / CAPTURE / QUERY_STATUS / QUERY_SETTINGS / QUERY_AVAILABLE_SETTINGS / SET_SETTING (FOCUS may carry `has_focus_point` + `focus_x` / `focus_y`); Status; IMAGE_READY; CURRENT_SETTINGS; AVAILABLE_SETTINGS.
 
 ## Testing
 
@@ -90,8 +90,10 @@ Full design: [HLD.md](./HLD.md).
 | MJPEG + `/captures/…` | `apps/server/server/http_server.go` |
 | Real / mock camera + last-capture store | `apps/server/camera/` |
 | GPhoto2 bindings | `apps/server/gphoto2/` |
+| mDNS advertise (TXT ports) | `apps/server/discovery/` |
 | Client WS + `lastImageReady` + exposure | `apps/mobile/components/WebSocketContext.tsx` |
-| Viewfinder + last-thumb + exposure pill | `apps/mobile/app/(tabs)/index.tsx`, `ExposureControls.tsx` |
+| Viewfinder + last-thumb + exposure pill + tap-to-focus | `apps/mobile/app/(tabs)/index.tsx`, `ExposureControls.tsx`, `CameraStream.tsx` |
+| iOS Bonjour browse | `apps/mobile/modules/mdns-browse/`, `hooks/useMdnsBrowse.ts` |
 | Live zoom | `apps/mobile/components/CameraStream.tsx` |
 | Glass HUD | `apps/mobile/components/ViewfinderGlass.tsx` |
 | Gallery review | `apps/mobile/app/gallery.tsx` |
@@ -115,5 +117,17 @@ Capture and many focus paths are **synchronous/blocking** in libgphoto2. The ser
 2. Server replies with `CURRENT_SETTINGS` / `AVAILABLE_SETTINGS` (mock has realistic lists; real available lists may be empty).
 3. Client sends `SET_SETTING` with field + string value; server applies via `SettingsController` on the serialized worker, then broadcasts updated `CURRENT_SETTINGS`.
 4. The viewfinder ISO / TV / AV pill reflects the new values.
+
+### Discovery (happy path)
+
+1. Server advertises `_5dcontrol._tcp` on all interfaces (demo and real). TXT: `version`, `http_port`, `ws_port`. SRV port is HTTP.
+2. iOS connection screen browses; tap a host to connect using those ports.
+3. If browse is empty or Local Network is denied, enter the LAN IPv4 (defaults 8888 / 8080).
+
+### Tap-to-focus (happy path)
+
+1. Tap the live view (pinch/pan still zoom). A reticle appears at the tap; `FOCUS` is sent with 0–1 coords.
+2. Demo mock logs the point and returns success. Live 5D III uses the existing AF drive (coords logged, AF-point not selected on the body).
+3. Hold the shutter ~300ms for center focus without a point.
 
 **App grid settings** (`settings.tsx` / `SettingsContext`) are local overlays only — keep them separate from camera exposure.

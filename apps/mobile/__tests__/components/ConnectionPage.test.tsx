@@ -18,15 +18,35 @@ const mockWebSocketContext = {
   status: "disconnected",
   cameraStatus: "disconnected",
   ip: "192.168.1.1",
+  wsPort: 8888,
+  httpPort: 8080,
   setIp: jest.fn(),
   reconnect: jest.fn(),
+  disconnect: jest.fn(),
   connect: jest.fn().mockResolvedValue(undefined),
   sendCommand: jest.fn(),
+};
+
+const mockMdnsBrowse = {
+  servers: [] as {
+    id: string;
+    name: string;
+    host: string;
+    ports: { wsPort: number; httpPort: number };
+  }[],
+  supported: true,
+  scanning: false,
+  error: null as string | null,
+  rescan: jest.fn(),
 };
 
 jest.mock("../../components/WebSocketContext", () => ({
   ...jest.requireActual("../../components/WebSocketContext"),
   useWebSocketContext: () => mockWebSocketContext,
+}));
+
+jest.mock("../../hooks/useMdnsBrowse", () => ({
+  useMdnsBrowse: () => mockMdnsBrowse,
 }));
 
 describe("ConnectionPage", () => {
@@ -37,6 +57,10 @@ describe("ConnectionPage", () => {
     // Reset the mock context to default values
     mockWebSocketContext.ip = "192.168.1.1";
     mockWebSocketContext.status = "disconnected";
+    mockMdnsBrowse.servers = [];
+    mockMdnsBrowse.supported = true;
+    mockMdnsBrowse.scanning = false;
+    mockMdnsBrowse.error = null;
   });
 
   it("should render correctly", () => {
@@ -211,5 +235,43 @@ describe("ConnectionPage", () => {
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.180");
     });
+  });
+
+  it("lists a discovered host and connects with TXT ports", async () => {
+    mockMdnsBrowse.servers = [
+      {
+        id: "5DControl@192.168.1.50:8080:8888",
+        name: "5DControl",
+        host: "192.168.1.50",
+        ports: { httpPort: 8080, wsPort: 8888 },
+      },
+    ];
+
+    const { getByText } = render(<ConnectionPage />);
+
+    expect(getByText("Nearby servers")).toBeTruthy();
+    fireEvent.press(getByText("5DControl (192.168.1.50)"));
+
+    await waitFor(() => {
+      expect(mockWebSocketContext.connect).toHaveBeenCalledWith(
+        "192.168.1.50",
+        { httpPort: 8080, wsPort: 8888 }
+      );
+    });
+  });
+
+  it("explains missing browse when the native module is unavailable", () => {
+    mockMdnsBrowse.supported = false;
+    const { getByText } = render(<ConnectionPage />);
+    expect(getByText(/dev client/i)).toBeTruthy();
+    expect(getByText("Connect")).toBeTruthy();
+  });
+
+  it("explains empty browse results", () => {
+    mockMdnsBrowse.supported = true;
+    mockMdnsBrowse.scanning = false;
+    mockMdnsBrowse.servers = [];
+    const { getByText } = render(<ConnectionPage />);
+    expect(getByText(/No servers found/i)).toBeTruthy();
   });
 });

@@ -16,7 +16,7 @@ timeline
       Usability : Demo mode, grid overlays, settings page
                 : Focus simplified for GPhoto2 limits
                 : WS hardening, GPhoto2 interface, unit tests, logging
-                : Real/mock camera split, CLAUDE.md
+                : Real/mock camera split, AGENTS.md
     section 2026-09
       Stabilization : Camera op serialization + capture completion bench
                     : Expo SDK 57 + Expo UI (remove RNEUI)
@@ -24,6 +24,7 @@ timeline
       M1 capture loop : IMAGE_READY + /captures HTTP + gallery/thumb wiring
                       : Mock stills, real gphoto2 download path (bench TBD)
       M2 exposure WS : FlatBuffers settings + viewfinder ISO/TV/AV pill (demo)
+      M3 mDNS + tap AF : iOS Bonjour browse + tap-to-focus reticle (demo)
 ```
 
 ### Shipped capability themes (evidence-based)
@@ -35,12 +36,13 @@ timeline
 | 2026-09 | Stabilization + Expo 57 polish | serialize camera ops, Expo UI, glass HUD, native zoom, thin gallery |
 | 2026-09 | M1 capture→review (sim path) | `IMAGE_READY`, last-capture cache, `/captures/…`, gallery + last-thumb |
 | 2026-09 | M2 exposure over wire (sim path) | settings commands + `CURRENT_SETTINGS` / `AVAILABLE_SETTINGS`; viewfinder exposure pill |
+| 2026-09 | M3 discovery + tap-to-focus (sim path) | iOS Bonjour browse; TXT dual-port contract; viewfinder tap reticle + FOCUS coords |
 
 ### Explicitly not shipped (code + docs evidence)
 
 - Verified under ~3s capture→thumb on travel-router Wi‑Fi with 5D Mark III card download (sim/demo path is wired; live bench remains)
 - Real gphoto2 available-choice enumeration (live get/set works; choice lists still empty on real camera)
-- Mobile mDNS/Bonjour discovery (server advertises only)
+- Positioned AF on the 5D III body (tap sends coords; live AF-point selection is best-effort / center drive)
 - Auth/TLS
 - Android checked-in native project / CI workflows
 - Advanced sequences: HDR, intervalometer, focus stacking, video
@@ -48,6 +50,8 @@ timeline
 **Shipped (M1 sim path):** WS `IMAGE_READY` after capture; HTTP thumb/full under `/captures/…`; mock still generation; iOS gallery + gallery-button last-thumb auto-pull; real-mode gphoto2 download with preview-frame fallback.
 
 **Shipped (M2 sim path):** WS query/set for ISO / shutter / aperture (+ EC); `CURRENT_SETTINGS` + `AVAILABLE_SETTINGS` messages; non-modal viewfinder exposure pill with a snapping value rail; mock returns realistic choice lists and mutates current values. Live available-list enumeration remains open.
+
+**Shipped (M3 sim path):** Server mDNS TXT advertises `http_port` + `ws_port`; iOS Bonjour browse of `_5dcontrol._tcp` with one-tap connect (manual IP remains); tap-to-focus reticle + `FOCUS` with normalized coords (demo mock logs the point); viewfinder disconnect / reconnect. Live 5D III AF-point selection is not verified.
 
 ---
 
@@ -59,7 +63,7 @@ Priorities map to [PRODUCT.md](./PRODUCT.md) P0–P3.
 
 - Accurate README, HLD, roadmap, demo guide
 - Treat `control.fbs` as protocol source of truth; call out generated `dist/` drift
-- Keep agent docs (`CLAUDE.md`) aligned with reality
+- Keep agent docs (`AGENTS.md`) aligned with reality
 
 ### Phase 1 — Close the capture loop (P0) — *MVP parity core*
 
@@ -80,14 +84,14 @@ Priorities map to [PRODUCT.md](./PRODUCT.md) P0–P3.
 | 1. Expose `SettingsController` over WS (current + available values) | **Done** (sim; real get/set wired, available lists empty) |
 | 2. Mobile exposure controls on viewfinder | **Done** (ISO / TV / AV pill + value rail) |
 | 3. Finish gphoto2 choice enumeration (today returns empty available lists) | **Open** |
-| 4. Mobile mDNS browse of `_5dcontrol._tcp`; clarify which port clients should use | **Open** |
-| 5. Disconnect / reconnect UX on the viewfinder | **Open** |
+| 4. Mobile mDNS browse of `_5dcontrol._tcp`; TXT dual-port contract | **Done** (iOS; needs a dev client, not Expo Go) |
+| 5. Disconnect / reconnect UX on the viewfinder | **Done** |
 
-**Exit criteria:** Change ISO/Tv/Av without leaving live view (**met in demo**); connect without typing IP on same LAN (**still open**).
+**Exit criteria:** Change ISO/Tv/Av without leaving live view (**met in demo**); connect without typing IP on same LAN (**met in demo / same-LAN browse**; Expo Go still uses manual IP).
 
 ### Phase 3 — Focus & composition quality (P0/P1)
 
-1. Tap-to-focus (positioned `FocusIndicator` already available)
+1. Tap-to-focus — **Done** (positioned reticle + `FOCUS` coords; live 5D III AF-point still best-effort)
 2. Incremental focus if supported by body
 3. Live-view overlays: histogram / highlight warning (beyond grids)
 4. Preview zoom quality pass (already partial)
@@ -124,7 +128,7 @@ Order TBD by persona (still Canon 5D III only):
 ```mermaid
 flowchart LR
   M1["M1: Gallery + last capture<br/>(sim done; bench open)"] --> M2["M2: Settings over wire<br/>(sim done)"]
-  M2 --> M3["M3: mDNS + tap-to-focus"]
+  M2 --> M3["M3: mDNS + tap-to-focus<br/>(sim done)"]
   M3 --> Later["Phase 5+: HDR / intervalometer / stacking / video"]
 ```
 
@@ -132,7 +136,7 @@ flowchart LR
 | --- | --- | --- |
 | M1 | HTTP JPEG serve + WS notify; iOS gallery MVP | **Sim/demo done**; 5D III timing bench open |
 | M2 | Settings over the wire + viewfinder controls | **Sim/demo done**; live available-list enumeration open |
-| M3 | mDNS connect on router Wi‑Fi + tap-to-focus | Next |
+| M3 | mDNS connect on router Wi‑Fi + tap-to-focus | **Sim/demo done**; live 5D III AF-point unverified |
 
 Everything in Phase 5+ waits until M1–M3 feel trustworthy on the travel-router + 5D Mark III setup.
 

@@ -33,6 +33,12 @@ table Command {
   // Used only for SET_SETTING.
   setting_field:SettingField;
   setting_value:string;
+  // Normalized viewfinder coords (0–1). Meaningful only when has_focus_point.
+  // Demo mock logs the point; live 5D III AF-point selection is best-effort
+  // (body still uses its center AF drive today).
+  has_focus_point:bool;
+  focus_x:float;
+  focus_y:float;
 }
 
 table Status {

@@ -6,8 +6,9 @@ See [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What works today
 
-- Manual IP connect, live MJPEG preview, focus + capture commands
-- Camera connected / battery status
+- mDNS connect on the same LAN (iOS Bonjour; manual IP fallback)
+- Live MJPEG preview, tap-to-focus reticle + focus/capture commands
+- Camera connected / battery status; viewfinder disconnect / reconnect
 - Local grid overlays (rule of thirds, golden ratio)
 - Capture → review: WS `IMAGE_READY` + HTTP `/captures/{id}/…` (demo + real download path)
 - Gallery auto-fetch; the last capture becomes the viewfinder's gallery button
@@ -30,7 +31,7 @@ Details: [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 1. Install libgphoto2; connect a **5D Mark III** over USB to the machine running the server.
 2. Start the server: `cd apps/server && npm run dev`
 3. Start the iOS app: `cd apps/mobile && npm run dev`
-4. Join the same LAN/AP and enter the server’s IP on the connection screen.
+4. Join the same LAN/AP. On iOS (dev client), tap a discovered 5DControl host, or enter the server’s IP.
 
 | Endpoint | Default |
 | --- | --- |
@@ -48,7 +49,7 @@ Details: [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Shipped timeline + planned phases |
 | [docs/PRODUCT.md](docs/PRODUCT.md) | Vision & competitive parity |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Commands, protocol, testing |
-| [CLAUDE.md](CLAUDE.md) | Agent-oriented repo guidance |
+| [AGENTS.md](AGENTS.md) | Agent-oriented repo guidance |
 
 ## Repository
 

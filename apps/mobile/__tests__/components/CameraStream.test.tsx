@@ -15,6 +15,7 @@ jest.mock('react-native-reanimated', () => {
     useSharedValue: (initial: unknown) => ({ value: initial }),
     useAnimatedStyle: (fn: () => unknown) => fn(),
     withTiming: (value: unknown) => value,
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
     View,
   };
 });
@@ -40,10 +41,27 @@ jest.mock('react-native-gesture-handler', () => {
         },
       }),
       Pan: () => ({
+        minDistance: function (this: unknown) {
+          return this;
+        },
         onStart: function (this: unknown) {
           return this;
         },
         onUpdate: function (this: unknown) {
+          return this;
+        },
+        onEnd: function (this: unknown) {
+          return this;
+        },
+      }),
+      Tap: () => ({
+        enabled: function (this: unknown) {
+          return this;
+        },
+        maxDuration: function (this: unknown) {
+          return this;
+        },
+        maxDistance: function (this: unknown) {
           return this;
         },
         onEnd: function (this: unknown) {

@@ -45,7 +45,7 @@ flowchart TB
 4. Adjust exposure settings remotely without walking back to the camera.
 5. Support advanced sequences (bracketing, intervalometer, focus stacking) for studio/macro/landscape workflows.
 
-Today we reliably deliver **(1)** and **(2)** (live view + focus/capture). **(3)** is productized on the demo/sim path (WS `IMAGE_READY` → HTTP still → gallery/last-thumb); live 5D III timing on travel-router Wi‑Fi still needs bench validation. **(4)** is productized on the demo/sim path (WS exposure settings + the viewfinder exposure pill); live available-choice enumeration is still open. **(5)** is not productized yet.
+Today we reliably deliver **(1)** and **(2)** (live view + focus/capture, including tap-to-focus UI). **(3)** is productized on the demo/sim path (WS `IMAGE_READY` → HTTP still → gallery/last-thumb); live 5D III timing on travel-router Wi‑Fi still needs bench validation. **(4)** is productized on the demo/sim path (WS exposure settings + the viewfinder exposure pill); live available-choice enumeration is still open. **(5)** is not productized yet. Connect-without-IP is productized on iOS (Bonjour) with manual IP fallback.
 
 ```mermaid
 flowchart LR
@@ -71,13 +71,13 @@ Targets use CamRanger 2 as the professional baseline. Status is relative to **5D
 | --- | --- | --- | --- |
 | Live view stream | Yes | Yes (MJPEG) | Maintain |
 | Remote capture | Yes | Yes | Maintain |
-| Focus (touch / incremental) | Touch + incremental | Center AF trigger only | P0 |
+| Focus (touch / incremental) | Touch + incremental | Tap-to-focus reticle + FOCUS coords (demo); 5D III AF-point best-effort / center drive. Incremental not started | P0 |
 | Camera settings remote (ISO/Tv/Av/WB/…) | Broad | Demo/sim wired over WS + viewfinder; live available-lists TBD | P0 |
 | Post-capture image review + zoom | Full-res up to 200% | Gallery + fullscreen review via HTTP stills after `IMAGE_READY` | P0 |
 | Auto thumbnails after capture | Yes | Yes (gallery-button last-thumb + gallery auto-fetch; live timing bench open) | P0 |
 | Grid / composition overlays | Many | Rule-of-thirds + golden ratio | P1 |
 | Histogram / blinkies / EXIF overlay | Yes | Not started | P1 |
-| Client discovery | Own Wi‑Fi AP | Server mDNS only; manual IP in app | P0 |
+| Client discovery | Own Wi‑Fi AP | iOS Bonjour `_5dcontrol._tcp` + manual IP fallback | P0 |
 | Multi-brand cameras | Canon/Nikon/Sony/Fuji | **5D Mark III only** | Deferred |
 | HDR / exposure bracketing | Advanced | Not started | P1 |
 | Intervalometer / time-lapse | Yes | Not started | P1 |

@@ -12,14 +12,21 @@ export type GalleryImage = {
 
 const GALLERY_DIR = "gallery-captures";
 
-export function photoUrlForIp(ip: string): string {
-  return `http://${ip}:8080/photo.jpg`;
+export function photoUrlForIp(
+  ip: string,
+  httpPort = 8080
+): string {
+  return `http://${ip}:${httpPort}/photo.jpg`;
 }
 
 /** Build an absolute media URL from a server HTTP path (e.g. /captures/id/full.jpg). */
-export function mediaUrlForIp(ip: string, path: string): string {
+export function mediaUrlForIp(
+  ip: string,
+  path: string,
+  httpPort = 8080
+): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `http://${ip}:8080${normalized}`;
+  return `http://${ip}:${httpPort}${normalized}`;
 }
 
 export function cacheKeyForFilename(filename: string): string {
@@ -71,9 +78,10 @@ export function listGalleryImages(): GalleryImage[] {
  * and seed expo-image's disk cache for fast thumbnail/full display.
  */
 export async function downloadLatestSnapshot(
-  serverIp: string
+  serverIp: string,
+  httpPort = 8080
 ): Promise<GalleryImage> {
-  return downloadJpegUrl(serverIp, photoUrlForIp(serverIp));
+  return downloadJpegUrl(serverIp, photoUrlForIp(serverIp, httpPort));
 }
 
 /**
@@ -83,9 +91,10 @@ export async function downloadLatestSnapshot(
 export async function downloadCaptureStill(
   serverIp: string,
   fullPath: string,
-  imageId?: string
+  imageId?: string,
+  httpPort = 8080
 ): Promise<GalleryImage> {
-  const url = mediaUrlForIp(serverIp, fullPath);
+  const url = mediaUrlForIp(serverIp, fullPath, httpPort);
   const createdAt =
     imageId && /^\d+$/.test(imageId) ? Number(imageId) : Date.now();
   const filename = `capture-${createdAt}.jpg`;
