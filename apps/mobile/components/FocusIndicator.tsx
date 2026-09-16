@@ -27,7 +27,7 @@ export function FocusIndicator({ x, y, centered }: FocusIndicatorProps) {
 
 const styles = StyleSheet.create({
   centeredHost: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 50,

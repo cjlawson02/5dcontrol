@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   disconnected: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "black",
     justifyContent: "center",
     alignItems: "center",
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
   },
   captureFlash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#fff",
     zIndex: 100,
   },
