@@ -30,24 +30,39 @@
             "persistent": true
         },
         "lint": {
+            "dependsOn": [
+                "^proto"
+            ],
             "outputs": []
         },
         "test": {
+            "dependsOn": [
+                "^proto"
+            ],
             "outputs": [
                 "coverage/**"
             ]
         },
         "test:integration": {
+            "dependsOn": [
+                "^proto"
+            ],
             "outputs": [
                 "coverage/**"
             ]
         },
         "test:unit": {
+            "dependsOn": [
+                "^proto"
+            ],
             "outputs": [
                 "coverage/**"
             ]
         },
         "test:all": {
+            "dependsOn": [
+                "^proto"
+            ],
             "outputs": [
                 "coverage/**"
             ]

@@ -65,6 +65,9 @@ jobs:
           sudo install -m 755 /tmp/flatc/flatc /usr/local/bin/flatc
           flatc --version
 
+      - name: Generate protocol buffers
+        run: npx turbo run proto
+
       - name: Cache Turbo
         uses: actions/cache@v6
         with:
@@ -109,6 +112,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libgphoto2-dev \
             pkg-config
+
+      - name: Install flatc
+        env:
+          FLATC_VERSION: v25.12.19
+        run: |
+          curl -fsSL "https://github.com/google/flatbuffers/releases/download/${FLATC_VERSION}/Linux.flatc.binary.g++-13.zip" \
+            -o /tmp/flatc.zip
+          unzip -qo /tmp/flatc.zip -d /tmp/flatc
+          sudo install -m 755 /tmp/flatc/flatc /usr/local/bin/flatc
+          flatc --version
+
+      - name: Generate protocol buffers
+        run: npm run proto --workspace=@5dcontrol/proto
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
