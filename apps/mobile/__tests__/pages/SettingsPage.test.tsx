@@ -49,7 +49,7 @@ describe("SettingsPage", () => {
       </TestWrapper>
     );
 
-    expect(getByText("Settings")).toBeTruthy();
+    expect(getByText("App Settings")).toBeTruthy();
     expect(getByText("← Back")).toBeTruthy();
     expect(getByText("Grid Overlay")).toBeTruthy();
     expect(getByText("Type")).toBeTruthy();
@@ -160,7 +160,7 @@ describe("SettingsPage", () => {
       </TestWrapper>
     );
 
-    expect(getByText("Settings")).toBeTruthy();
+    expect(getByText("App Settings")).toBeTruthy();
     expect(getByTestId("grid-type-selected-label").props.children).toBe(
       "No Grid"
     );

@@ -62,7 +62,7 @@ cd packages/proto
 npm run proto    # regenerates Go + TypeScript from control.fbs
 ```
 
-**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema: FOCUS / CAPTURE / QUERY_STATUS, Status, and IMAGE_READY (capture notify with HTTP paths).
+**Source of truth is `control.fbs`.** Do not extend behavior from stale files under `packages/proto/dist` without regenerating. Current schema: FOCUS / CAPTURE / QUERY_STATUS / QUERY_SETTINGS / QUERY_AVAILABLE_SETTINGS / SET_SETTING; Status; IMAGE_READY; CURRENT_SETTINGS; AVAILABLE_SETTINGS.
 
 ## Testing
 
@@ -86,15 +86,16 @@ Full design: [HLD.md](./HLD.md).
 
 | Area | Start here |
 | --- | --- |
-| WS hub + `IMAGE_READY` | `apps/server/server/ws_server.go` |
+| WS hub + `IMAGE_READY` + settings | `apps/server/server/ws_server.go`, `ws_settings.go` |
 | MJPEG + `/captures/…` | `apps/server/server/http_server.go` |
 | Real / mock camera + last-capture store | `apps/server/camera/` |
 | GPhoto2 bindings | `apps/server/gphoto2/` |
-| Client WS + `lastImageReady` | `apps/mobile/components/WebSocketContext.tsx` |
-| Viewfinder + last-thumb | `apps/mobile/app/(tabs)/index.tsx` |
+| Client WS + `lastImageReady` + exposure | `apps/mobile/components/WebSocketContext.tsx` |
+| Viewfinder + last-thumb + exposure pill | `apps/mobile/app/(tabs)/index.tsx`, `ExposureControls.tsx` |
 | Live zoom | `apps/mobile/components/CameraStream.tsx` |
 | Glass HUD | `apps/mobile/components/ViewfinderGlass.tsx` |
 | Gallery review | `apps/mobile/app/gallery.tsx` |
+| App grid settings (not camera exposure) | `apps/mobile/app/settings.tsx`, `SettingsContext` |
 
 ### Camera operations note
 
@@ -104,10 +105,15 @@ Capture and many focus paths are **synchronous/blocking** in libgphoto2. The ser
 
 1. Client sends `CAPTURE` over WS.
 2. Server captures, caches still, broadcasts `IMAGE_READY` with HTTP paths.
-3. Client GETs `/captures/{id}/full.jpg` (gallery + viewfinder last-thumb).
+3. Client GETs `/captures/{id}/full.jpg` (gallery + the viewfinder's gallery-button thumb).
 
 `/photo.jpg` is only a live-view snapshot fallback for manual “Fetch latest” when no capture notify is available.
 
-### Wiring new status consumers (mobile)
+### Exposure settings (happy path)
 
-When protocol grows, register handlers via WebSocket context setters (pattern already used for connection/status/`lastImageReady`). Prefer extending FlatBuffers + context rather than ad-hoc JSON.
+1. On connect, client sends `QUERY_SETTINGS` + `QUERY_AVAILABLE_SETTINGS`.
+2. Server replies with `CURRENT_SETTINGS` / `AVAILABLE_SETTINGS` (mock has realistic lists; real available lists may be empty).
+3. Client sends `SET_SETTING` with field + string value; server applies via `SettingsController` on the serialized worker, then broadcasts updated `CURRENT_SETTINGS`.
+4. The viewfinder ISO / TV / AV pill reflects the new values.
+
+**App grid settings** (`settings.tsx` / `SettingsContext`) are local overlays only — keep them separate from camera exposure.

@@ -3,6 +3,7 @@ import {
   ControlType,
   Message,
   MessageType,
+  SettingField,
 } from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -26,16 +27,35 @@ export type ImageReadyInfo = {
   receivedAt: number;
 };
 
+/** Camera exposure (ISO/Tv/Av/EC) — not the app grid SettingsContext. */
+export type CameraExposureSettings = {
+  shutterSpeed: string;
+  aperture: string;
+  iso: string;
+  exposureCompensation: string;
+};
+
+export type AvailableExposureSettings = {
+  shutterSpeeds: string[];
+  apertures: string[];
+  isos: string[];
+  exposureCompensations: string[];
+};
+
 interface WebSocketContextValue {
   status: ConnectionStatus;
   cameraStatus: ConnectionStatus;
   batteryLevel: number;
   ip: string | null;
   lastImageReady: ImageReadyInfo | null;
+  currentSettings: CameraExposureSettings | null;
+  availableSettings: AvailableExposureSettings | null;
   setIp: (ip: string | null) => void;
   reconnect: () => void;
   connect: (ip: string) => Promise<void>;
   sendCommand: (type: ControlType) => void;
+  setCameraSetting: (field: SettingField, value: string) => void;
+  queryCameraSettings: () => void;
   loadIp?: () => Promise<void>;
   clearLastImageReady: () => void;
 }
@@ -60,6 +80,40 @@ const buildCommandMessage = (type: ControlType): Uint8Array => {
   return builder.asUint8Array();
 };
 
+const buildSetSettingMessage = (
+  field: SettingField,
+  value: string
+): Uint8Array => {
+  const builder = new Builder(96);
+  const valueOffset = builder.createString(value);
+
+  Command.startCommand(builder);
+  Command.addType(builder, ControlType.SET_SETTING);
+  Command.addSettingField(builder, field);
+  Command.addSettingValue(builder, valueOffset);
+  const commandOffset = Command.endCommand(builder);
+
+  Message.startMessage(builder);
+  Message.addMessageType(builder, MessageType.COMMAND);
+  Message.addCommand(builder, commandOffset);
+  const messageOffset = Message.endMessage(builder);
+
+  builder.finish(messageOffset);
+  return builder.asUint8Array();
+};
+
+const readStringList = (
+  length: number,
+  at: (i: number) => string | null | undefined
+): string[] => {
+  const out: string[] = [];
+  for (let i = 0; i < length; i++) {
+    const v = at(i);
+    if (v) out.push(v);
+  }
+  return out;
+};
+
 const STORAGE_KEY = "server_ip";
 const DEFAULT_IP = "192.168.1.1";
 
@@ -72,6 +126,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   const [lastImageReady, setLastImageReady] = useState<ImageReadyInfo | null>(
     null
   );
+  const [currentSettings, setCurrentSettings] =
+    useState<CameraExposureSettings | null>(null);
+  const [availableSettings, setAvailableSettings] =
+    useState<AvailableExposureSettings | null>(null);
 
   const setConnected = useCallback(() => setStatus("connected"), []);
   const setDisconnected = useCallback(() => setStatus("disconnected"), []);
@@ -160,15 +218,18 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
       logger.info(`WebSocket: Connection opened successfully to ${wsUrl}`);
       setConnected();
 
-      const msg = buildCommandMessage(ControlType.QUERY_STATUS);
-      logger.debug(`WebSocket: Sending QUERY_STATUS command`);
-      ws.send(msg);
+      logger.debug(`WebSocket: Sending QUERY_STATUS + settings queries`);
+      ws.send(buildCommandMessage(ControlType.QUERY_STATUS));
+      ws.send(buildCommandMessage(ControlType.QUERY_SETTINGS));
+      ws.send(buildCommandMessage(ControlType.QUERY_AVAILABLE_SETTINGS));
     };
 
     ws.onclose = (e) => {
       logger.info(`WebSocket: Connection closed:`, e.code, e.reason);
       setDisconnected();
       setCameraStatus("disconnected");
+      setCurrentSettings(null);
+      setAvailableSettings(null);
     };
 
     ws.onerror = (error) => {
@@ -209,9 +270,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
       logger.debug(`WebSocket: Data length: ${data.length} bytes`);
       const msg = Message.getRootAsMessage(new ByteBuffer(data));
       const msgType = msg.messageType();
-      logger.debug(
-        `WebSocket: Message type: ${msgType} (STATUS=${MessageType.STATUS}, IMAGE_READY=${MessageType.IMAGE_READY})`
-      );
+      logger.debug(`WebSocket: Message type: ${msgType}`);
 
       if (msgType === MessageType.STATUS) {
         const statusMsg = msg.status();
@@ -252,6 +311,45 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
           fullPath,
           receivedAt: Date.now(),
         });
+      } else if (msgType === MessageType.CURRENT_SETTINGS) {
+        const cs = msg.currentSettings();
+        if (!cs) {
+          logger.warn(`WebSocket: CURRENT_SETTINGS missing payload`);
+          return;
+        }
+        const next: CameraExposureSettings = {
+          shutterSpeed: cs.shutterSpeed() ?? "",
+          aperture: cs.aperture() ?? "",
+          iso: cs.iso() ?? "",
+          exposureCompensation: cs.exposureCompensation() ?? "",
+        };
+        logger.info(
+          `WebSocket: Current settings ISO=${next.iso} Tv=${next.shutterSpeed} Av=${next.aperture}`
+        );
+        setCurrentSettings(next);
+      } else if (msgType === MessageType.AVAILABLE_SETTINGS) {
+        const as = msg.availableSettings();
+        if (!as) {
+          logger.warn(`WebSocket: AVAILABLE_SETTINGS missing payload`);
+          return;
+        }
+        const next: AvailableExposureSettings = {
+          shutterSpeeds: readStringList(as.shutterSpeedsLength(), (i) =>
+            as.shutterSpeeds(i)
+          ),
+          apertures: readStringList(as.aperturesLength(), (i) =>
+            as.apertures(i)
+          ),
+          isos: readStringList(as.isosLength(), (i) => as.isos(i)),
+          exposureCompensations: readStringList(
+            as.exposureCompensationsLength(),
+            (i) => as.exposureCompensations(i)
+          ),
+        };
+        logger.info(
+          `WebSocket: Available settings ISO=${next.isos.length} Tv=${next.shutterSpeeds.length} Av=${next.apertures.length}`
+        );
+        setAvailableSettings(next);
       } else {
         logger.warn(`WebSocket: Received unhandled message type: ${msgType}`);
       }
@@ -272,16 +370,53 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     wsRef.current?.send(msg);
   }, []);
 
+  const setCameraSetting = useCallback(
+    (field: SettingField, value: string) => {
+      logger.debug(
+        `WebSocket: SET_SETTING field=${SettingField[field]} value=${value}`
+      );
+      // Optimistic local update so the HUD feels snappy; server will confirm.
+      setCurrentSettings((prev) => {
+        if (!prev) return prev;
+        switch (field) {
+          case SettingField.ISO:
+            return { ...prev, iso: value };
+          case SettingField.SHUTTER_SPEED:
+            return { ...prev, shutterSpeed: value };
+          case SettingField.APERTURE:
+            return { ...prev, aperture: value };
+          case SettingField.EXPOSURE_COMPENSATION:
+            return { ...prev, exposureCompensation: value };
+          default:
+            return prev;
+        }
+      });
+      wsRef.current?.send(buildSetSettingMessage(field, value));
+    },
+    []
+  );
+
+  const queryCameraSettings = useCallback(() => {
+    wsRef.current?.send(buildCommandMessage(ControlType.QUERY_SETTINGS));
+    wsRef.current?.send(
+      buildCommandMessage(ControlType.QUERY_AVAILABLE_SETTINGS)
+    );
+  }, []);
+
   const value: WebSocketContextValue = {
     status,
     cameraStatus,
     batteryLevel,
     ip,
     lastImageReady,
+    currentSettings,
+    availableSettings,
     setIp,
     reconnect,
     connect,
     sendCommand,
+    setCameraSetting,
+    queryCameraSettings,
     loadIp,
     clearLastImageReady,
   };

@@ -1,11 +1,6 @@
+import { Button, Host, Row, Spacer, Text } from "@expo/ui";
 import { ReactNode } from "react";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from "react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PageLayoutProps {
@@ -18,7 +13,7 @@ interface PageLayoutProps {
 }
 
 /**
- * Shared page layout component with consistent header and structure
+ * Shared page chrome (back + title) using Expo UI universal primitives.
  */
 export function PageLayout({
   title,
@@ -28,61 +23,56 @@ export function PageLayout({
   scale = 1,
   containerStyle,
 }: PageLayoutProps) {
-  const headerStyles = createHeaderStyles({ transparent, scale });
+  const padH = Math.round(scale * 20);
+  const padV = Math.round(scale * 10);
+  const titleSize = Math.round(scale * 18);
+  const balanceWidth = Math.round(scale * 72);
 
   return (
     <SafeAreaView style={[styles.container, containerStyle]}>
-      <View style={headerStyles.header}>
-        <TouchableOpacity onPress={onBack} style={headerStyles.backButton}>
-          <Text style={headerStyles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={headerStyles.title}>{title}</Text>
-        <View style={headerStyles.placeholder} />
-      </View>
+      <Host
+        colorScheme="dark"
+        matchContents={{ vertical: true }}
+        style={{
+          width: "100%",
+          borderBottomWidth: transparent ? 0 : StyleSheet.hairlineWidth,
+          borderBottomColor: transparent
+            ? "transparent"
+            : "rgba(255, 255, 255, 0.1)",
+        }}
+      >
+        <Row
+          alignment="center"
+          spacing={8}
+          style={{
+            paddingHorizontal: padH,
+            paddingVertical: padV,
+            backgroundColor: transparent ? "transparent" : undefined,
+          }}
+        >
+          <Button
+            testID="page-back"
+            label="← Back"
+            variant="text"
+            onPress={onBack}
+          />
+          <Spacer flexible />
+          <Text
+            textStyle={{
+              color: "#FFFFFF",
+              fontSize: titleSize,
+              fontWeight: "700",
+            }}
+          >
+            {title}
+          </Text>
+          <Spacer flexible />
+          <Spacer size={balanceWidth} />
+        </Row>
+      </Host>
       {children}
     </SafeAreaView>
   );
-}
-
-/**
- * Creates header styles with optional transparency and scaling
- */
-function createHeaderStyles(options?: {
-  transparent?: boolean;
-  scale?: number;
-}) {
-  const { transparent = false, scale = 1 } = options || {};
-
-  return StyleSheet.create({
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: Math.round(scale * 20),
-      paddingVertical: Math.round(scale * 10),
-      borderBottomWidth: transparent ? 0 : 1,
-      borderBottomColor: transparent
-        ? "transparent"
-        : "rgba(255, 255, 255, 0.1)",
-      backgroundColor: transparent ? "transparent" : undefined,
-    },
-    title: {
-      color: "#fff",
-      fontSize: Math.round(scale * 18),
-      fontWeight: "bold" as const,
-    },
-    backButton: {
-      padding: Math.round(scale * 8),
-    },
-    backButtonText: {
-      color: "#fff",
-      fontSize: Math.round(scale * 16),
-      fontWeight: "600" as const,
-    },
-    placeholder: {
-      width: Math.round(scale * 60),
-    },
-  });
 }
 
 const styles = StyleSheet.create({

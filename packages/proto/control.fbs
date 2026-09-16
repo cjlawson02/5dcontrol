@@ -4,18 +4,35 @@ enum ControlType:byte {
   NONE = 0,
   FOCUS = 1,
   CAPTURE = 2,
-  QUERY_STATUS = 3
+  QUERY_STATUS = 3,
+  QUERY_SETTINGS = 4,
+  QUERY_AVAILABLE_SETTINGS = 5,
+  SET_SETTING = 6
+}
+
+// Which exposure field SET_SETTING targets.
+enum SettingField:byte {
+  NONE = 0,
+  ISO = 1,
+  SHUTTER_SPEED = 2,
+  APERTURE = 3,
+  EXPOSURE_COMPENSATION = 4
 }
 
 enum MessageType:byte {
   UNKNOWN = 0,
   COMMAND = 1,
   STATUS = 2,
-  IMAGE_READY = 3
+  IMAGE_READY = 3,
+  CURRENT_SETTINGS = 4,
+  AVAILABLE_SETTINGS = 5
 }
 
 table Command {
   type:ControlType;
+  // Used only for SET_SETTING.
+  setting_field:SettingField;
+  setting_value:string;
 }
 
 table Status {
@@ -31,11 +48,27 @@ table ImageReady {
   full_path:string;
 }
 
+table CurrentSettings {
+  shutter_speed:string;
+  aperture:string;
+  iso:string;
+  exposure_compensation:string;
+}
+
+table AvailableSettings {
+  shutter_speeds:[string];
+  apertures:[string];
+  isos:[string];
+  exposure_compensations:[string];
+}
+
 table Message {
   message_type:MessageType;
   command:Command;
   status:Status;
   image_ready:ImageReady;
+  current_settings:CurrentSettings;
+  available_settings:AvailableSettings;
 }
 
 root_type Message;

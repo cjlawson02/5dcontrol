@@ -211,6 +211,14 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 					case Proto.ControlTypeQUERY_STATUS:
 						log.Println("Status query received")
 						sendStatus(conn, cam)
+					case Proto.ControlTypeQUERY_SETTINGS:
+						log.Println("Settings query received")
+						sendCurrentSettings(conn, cam)
+					case Proto.ControlTypeQUERY_AVAILABLE_SETTINGS:
+						log.Println("Available settings query received")
+						sendAvailableSettings(conn, cam)
+					case Proto.ControlTypeSET_SETTING:
+						handleSetSetting(cam, cmd)
 					}
 				}
 
@@ -218,6 +226,8 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 				log.Println("Unexpected STATUS message from client")
 			case Proto.MessageTypeIMAGE_READY:
 				log.Println("Unexpected IMAGE_READY message from client")
+			case Proto.MessageTypeCURRENT_SETTINGS, Proto.MessageTypeAVAILABLE_SETTINGS:
+				log.Println("Unexpected settings message from client")
 			}
 
 		}

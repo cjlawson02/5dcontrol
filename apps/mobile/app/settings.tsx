@@ -4,6 +4,8 @@ import { PageLayout } from "../components/PageLayout";
 import { GridType, useSettings } from "../contexts/SettingsContext";
 import { logger } from "../utils/logger";
 
+/** App grid overlays only — camera ISO/Tv/Av live on the viewfinder via WebSocket. */
+
 const GRID_TYPES: readonly { id: GridType; name: string }[] = [
   { id: "none", name: "No Grid" },
   { id: "rule-of-thirds", name: "Rule of Thirds" },
@@ -23,7 +25,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <PageLayout title="Settings" onBack={handleBack}>
+    <PageLayout title="App Settings" onBack={handleBack}>
       <Host colorScheme="dark" style={{ flex: 1 }}>
         <FieldGroup style={{ backgroundColor: "#000000" }}>
           <FieldGroup.Section title="Grid Overlay">

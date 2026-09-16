@@ -1,4 +1,4 @@
-import { ControlType, Message, MessageType } from "@5dcontrol/proto";
+import { ControlType, Message, MessageType, SettingField } from "@5dcontrol/proto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
@@ -358,6 +358,99 @@ describe("WebSocketContext", () => {
       await waitFor(() => {
         expect(result.current.cameraStatus).toBe("connected");
       });
+    });
+
+    it("should handle CURRENT_SETTINGS messages", async () => {
+      const mockCurrent = {
+        shutterSpeed: jest.fn(() => "1/125"),
+        aperture: jest.fn(() => "f/5.6"),
+        iso: jest.fn(() => "400"),
+        exposureCompensation: jest.fn(() => "0"),
+      };
+      const mockMessage = {
+        messageType: jest.fn(() => MessageType.CURRENT_SETTINGS),
+        currentSettings: jest.fn(() => mockCurrent),
+      };
+
+      jest
+        .spyOn(Message, "getRootAsMessage")
+        .mockReturnValue(mockMessage as any);
+
+      const mockWebSocket = {
+        close: jest.fn(),
+        send: jest.fn(),
+        onopen: null,
+        onclose: null,
+        onerror: null,
+        onmessage: null as null | ((e: { data: Uint8Array }) => Promise<void>),
+      };
+
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
+      );
+
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.ip).toBe("192.168.1.1");
+      });
+
+      act(() => {
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(mockWebSocket.onmessage).toEqual(expect.any(Function));
+      });
+
+      await act(async () => {
+        await mockWebSocket.onmessage?.({
+          data: new Uint8Array([1, 2, 3, 4]),
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.currentSettings?.iso).toBe("400");
+        expect(result.current.currentSettings?.shutterSpeed).toBe("1/125");
+        expect(result.current.currentSettings?.aperture).toBe("f/5.6");
+      });
+    });
+
+    it("should send SET_SETTING via setCameraSetting", async () => {
+      const mockWebSocket = {
+        close: jest.fn(),
+        send: jest.fn(),
+        onopen: null,
+        onclose: null,
+        onerror: null,
+        onmessage: null,
+      };
+
+      (global.WebSocket as unknown as jest.Mock).mockImplementation(
+        () => mockWebSocket
+      );
+
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.ip).toBe("192.168.1.1");
+      });
+
+      act(() => {
+        result.current.reconnect();
+      });
+
+      await waitFor(() => {
+        expect(global.WebSocket).toHaveBeenCalled();
+      });
+
+      act(() => {
+        result.current.setCameraSetting(SettingField.ISO, "800");
+      });
+
+      expect(mockWebSocket.send).toHaveBeenCalled();
     });
 
     it("should close existing connection before creating new one", async () => {

@@ -1,37 +1,38 @@
-import { Link, Stack } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Button, Column, Host, Text } from "@expo/ui";
+import { router, Stack } from "expo-router";
+import { StyleSheet } from "react-native";
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Oops!" }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>This screen does not exist.</Text>
-        <Link href="/" asChild>
-          <Pressable accessibilityRole="button">
-            <Text style={styles.link}>Go to home screen!</Text>
-          </Pressable>
-        </Link>
-      </View>
+      <Host colorScheme="dark" style={styles.host}>
+        <Column spacing={20} alignment="center" style={{ padding: 20 }}>
+          <Text
+            textStyle={{
+              color: "#FFFFFF",
+              fontSize: 20,
+              fontWeight: "600",
+              textAlign: "center",
+            }}
+          >
+            This screen does not exist.
+          </Text>
+          <Button
+            label="Go to home screen!"
+            variant="text"
+            onPress={() => router.replace("/")}
+          />
+        </Column>
+      </Host>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  host: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-  },
-  title: {
-    marginBottom: 20,
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  link: {
-    color: "#007AFF",
-    fontSize: 16,
   },
 });

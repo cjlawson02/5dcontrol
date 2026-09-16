@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { BottomSheet, Button, Column, Host, Row, Spacer, Text } from "@expo/ui";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -6,10 +6,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Modal,
-  Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -66,7 +63,6 @@ export default function GalleryScreen() {
     };
   }, [refreshLocal]);
 
-  // Auto-pull when the server notifies that a capture is ready.
   useEffect(() => {
     if (!ip || !lastImageReady) {
       return;
@@ -156,124 +152,115 @@ export default function GalleryScreen() {
 
   return (
     <PageLayout title="Gallery" onBack={handleBack}>
-      <View style={styles.toolbar}>
-        <TouchableOpacity
-          style={[styles.fetchButton, fetching && styles.fetchButtonDisabled]}
-          onPress={handleFetchLatest}
-          disabled={fetching || !ip}
-          activeOpacity={0.7}
-          testID="gallery-fetch-latest"
-        >
-          {fetching ? (
-            <ActivityIndicator color="#fff" size="small" />
+      <Host colorScheme="dark" style={styles.host}>
+        <Column spacing={12} style={{ paddingHorizontal: GRID_PADDING }}>
+          <Row alignment="center" spacing={12}>
+            <Button
+              testID="gallery-fetch-latest"
+              label={fetching ? "Fetching…" : "Fetch latest"}
+              variant="outlined"
+              disabled={fetching || !ip}
+              onPress={handleFetchLatest}
+            />
+            <Spacer flexible />
+            <Text textStyle={{ color: "#888888", fontSize: 13 }}>
+              {`${images.length} ${images.length === 1 ? "image" : "images"}`}
+            </Text>
+          </Row>
+
+          {error ? (
+            <Text
+              testID="gallery-error"
+              textStyle={{ color: "#ff6b6b", fontSize: 13 }}
+            >
+              {error}
+            </Text>
+          ) : null}
+
+          {loading ? (
+            <Column spacing={12} alignment="center" style={{ padding: 40 }}>
+              <ActivityIndicator size="large" color="#fff" />
+              <Text textStyle={{ color: "#666666", fontSize: 14 }}>
+                Loading gallery…
+              </Text>
+            </Column>
+          ) : images.length === 0 ? (
+            <Column
+              spacing={12}
+              alignment="center"
+              testID="gallery-empty"
+              style={{ padding: 40 }}
+            >
+              <Text
+                textStyle={{
+                  color: "#FFFFFF",
+                  fontSize: 18,
+                  fontWeight: "600",
+                }}
+              >
+                No images yet
+              </Text>
+              <Text
+                textStyle={{
+                  color: "#666666",
+                  fontSize: 14,
+                  textAlign: "center",
+                }}
+              >
+                Capture from the viewfinder to pull the still automatically, or
+                fetch the latest capture / live snapshot.
+              </Text>
+            </Column>
           ) : (
-            <>
-              <Feather name="download" color="#fff" size={16} />
-              <Text style={styles.fetchButtonText}>Fetch latest</Text>
-            </>
+            <FlatList
+              data={images}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              numColumns={COLUMNS}
+              contentContainerStyle={styles.grid}
+              columnWrapperStyle={styles.row}
+              showsVerticalScrollIndicator={false}
+              testID="gallery-list"
+            />
           )}
-        </TouchableOpacity>
-        <Text style={styles.countText}>
-          {images.length} {images.length === 1 ? "image" : "images"}
-        </Text>
-      </View>
+        </Column>
+      </Host>
 
-      {error ? (
-        <Text style={styles.errorText} testID="gallery-error">
-          {error}
-        </Text>
-      ) : null}
-
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.muted}>Loading gallery…</Text>
-        </View>
-      ) : images.length === 0 ? (
-        <View style={styles.centered} testID="gallery-empty">
-          <Feather name="image" color="#666" size={64} />
-          <Text style={styles.emptyTitle}>No images yet</Text>
-          <Text style={styles.muted}>
-            Capture from the viewfinder to pull the still automatically, or
-            fetch the latest capture / live snapshot.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={images}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          numColumns={COLUMNS}
-          contentContainerStyle={styles.grid}
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
-          testID="gallery-list"
-        />
-      )}
-
-      <Modal
-        visible={selected !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelected(null)}
+      <BottomSheet
+        isPresented={selected !== null}
+        onDismiss={() => setSelected(null)}
+        snapPoints={["full"]}
+        contentPadding={0}
+        containerColor="#000000"
+        showDragIndicator
+        testID="gallery-fullscreen-sheet"
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setSelected(null)}
-          testID="gallery-fullscreen-backdrop"
-        >
-          {selected ? (
+        {selected ? (
+          <View style={styles.fullWrap} testID="gallery-fullscreen-backdrop">
             <Image
               source={{ uri: selected.uri, cacheKey: selected.cacheKey }}
               style={styles.fullImage}
               contentFit="contain"
             />
-          ) : null}
-        </Pressable>
-      </Modal>
+            <Host colorScheme="dark" matchContents>
+              <Button
+                label="Close"
+                variant="text"
+                onPress={() => setSelected(null)}
+              />
+            </Host>
+          </View>
+        ) : null}
+      </BottomSheet>
     </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  toolbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: GRID_PADDING,
-    paddingVertical: 12,
-  },
-  fetchButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(144, 144, 144, 0.5)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 130,
-    justifyContent: "center",
-  },
-  fetchButtonDisabled: {
-    opacity: 0.6,
-  },
-  fetchButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  countText: {
-    color: "#888",
-    fontSize: 13,
-  },
-  errorText: {
-    color: "#ff6b6b",
-    paddingHorizontal: GRID_PADDING,
-    marginBottom: 8,
-    fontSize: 13,
+  host: {
+    flex: 1,
   },
   grid: {
-    paddingHorizontal: GRID_PADDING,
     paddingBottom: 24,
   },
   row: {
@@ -291,32 +278,15 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  centered: {
+  fullWrap: {
     flex: 1,
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 40,
-    gap: 12,
-  },
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  muted: {
-    color: "#666",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
-    justifyContent: "center",
-    alignItems: "center",
+    paddingBottom: 24,
   },
   fullImage: {
     width: screenWidth,
-    height: screenHeight * 0.85,
+    height: screenHeight * 0.75,
   },
 });

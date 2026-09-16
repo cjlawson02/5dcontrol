@@ -10,7 +10,8 @@ See [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 - Camera connected / battery status
 - Local grid overlays (rule of thirds, golden ratio)
 - Capture → review: WS `IMAGE_READY` + HTTP `/captures/{id}/…` (demo + real download path)
-- Gallery auto-fetch + viewfinder last-capture thumb
+- Gallery auto-fetch; the last capture becomes the viewfinder's gallery button
+- Remote exposure (ISO / Tv / Av) over WS + a non-modal viewfinder pill with a snapping value rail (demo/sim; live available-lists TBD)
 - Demo mode with a mock camera (no hardware)
 
 ## Quick start

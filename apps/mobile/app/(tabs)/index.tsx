@@ -1,4 +1,5 @@
 import { ControlType } from "@5dcontrol/proto";
+import { Column, Host, Text } from "@expo/ui";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -8,7 +9,7 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
+  Text as RNText,
   View,
 } from "react-native";
 import Animated, {
@@ -20,6 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraStream } from "../../components/CameraStream";
+import { ExposureControls } from "../../components/ExposureControls";
 import { FocusIndicator } from "../../components/FocusIndicator";
 import { GridOverlay } from "../../components/GridOverlay";
 import {
@@ -49,6 +51,9 @@ export default function HomeScreen() {
     status,
     batteryLevel,
     lastImageReady,
+    currentSettings,
+    availableSettings,
+    setCameraSetting,
   } = useWebSocketContext();
   const { state: settings } = useSettings();
 
@@ -177,35 +182,32 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {cameraStatus !== "connected" ? (
-        <SafeAreaView
-          style={{
-            ...StyleSheet.absoluteFill,
-            backgroundColor: "black",
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: 200,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 30,
-              marginBottom: 5,
-            }}
-          >
-            Camera Disconnected
-          </Text>
-          <Text
-            style={{
-              color: "white",
-              fontSize: 18,
-              marginBottom: 20,
-            }}
-          >
-            Please ensure the camera is powered on and connected to the
-            5DControl.
-          </Text>
-          <ActivityIndicator color="#fff" />
+        <SafeAreaView style={styles.disconnected}>
+          <Host colorScheme="dark" style={styles.disconnectedHost}>
+            <Column spacing={12} alignment="center" style={{ padding: 24 }}>
+              <Text
+                textStyle={{
+                  color: "#FFFFFF",
+                  fontSize: 28,
+                  fontWeight: "700",
+                  textAlign: "center",
+                }}
+              >
+                Camera Disconnected
+              </Text>
+              <Text
+                textStyle={{
+                  color: "#FFFFFF",
+                  fontSize: 16,
+                  textAlign: "center",
+                }}
+              >
+                Please ensure the camera is powered on and connected to the
+                5DControl.
+              </Text>
+              <ActivityIndicator color="#fff" />
+            </Column>
+          </Host>
         </SafeAreaView>
       ) : (
         <>
@@ -227,35 +229,20 @@ export default function HomeScreen() {
               fallbackStyle={styles.chromeFallback}
             >
               <Feather name="wifi" color={getConnectionColor()} size={20} />
-              <Text
-                style={[styles.connectionText, { color: getConnectionColor() }]}
+              <RNText
+                style={[
+                  styles.connectionText,
+                  { color: getConnectionColor() },
+                ]}
               >
                 {cameraStatus === "connected"
                   ? "Camera"
                   : status === "connected"
                     ? "Server"
                     : "Offline"}
-              </Text>
+              </RNText>
             </ViewfinderGlass>
 
-            {lastThumb ? (
-              <Pressable
-                onPress={openGallery}
-                accessibilityRole="button"
-                accessibilityLabel="Last capture"
-                testID="last-capture-thumb"
-                style={styles.lastThumbWrap}
-              >
-                <Image
-                  source={{ uri: lastThumb.uri, cacheKey: lastThumb.cacheKey }}
-                  style={styles.lastThumb}
-                  contentFit="cover"
-                />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <ViewfinderGlassContainer style={styles.rightNav} spacing={16}>
             <ViewfinderGlass
               style={styles.batteryIndicator}
               fallbackStyle={styles.chromeFallback}
@@ -265,20 +252,22 @@ export default function HomeScreen() {
                 color={getBatteryColor(batteryLevel)}
                 size={20}
               />
-              <Text
+              <RNText
                 style={[
                   styles.batteryText,
                   { color: getBatteryColor(batteryLevel) },
                 ]}
               >
                 {batteryLevel}%
-              </Text>
+              </RNText>
             </ViewfinderGlass>
+          </View>
 
+          <ViewfinderGlassContainer style={styles.rightNav} spacing={16}>
             <Pressable
               onPress={openSettings}
               accessibilityRole="button"
-              accessibilityLabel="Settings"
+              accessibilityLabel="App settings"
             >
               <ViewfinderGlass
                 style={styles.navButton}
@@ -315,10 +304,29 @@ export default function HomeScreen() {
                 fallbackStyle={styles.navButtonFallback}
                 isInteractive
               >
-                <Feather name="grid" color="#fff" size={24} />
+                {lastThumb ? (
+                  <Image
+                    source={{
+                      uri: lastThumb.uri,
+                      cacheKey: lastThumb.cacheKey,
+                    }}
+                    style={styles.galleryThumb}
+                    contentFit="cover"
+                    testID="last-capture-thumb"
+                  />
+                ) : (
+                  <Feather name="grid" color="#fff" size={24} />
+                )}
               </ViewfinderGlass>
             </Pressable>
           </ViewfinderGlassContainer>
+
+          <ExposureControls
+            current={currentSettings}
+            available={availableSettings}
+            onSet={setCameraSetting}
+            disabled={cameraStatus !== "connected"}
+          />
         </>
       )}
     </View>
@@ -330,8 +338,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
+  disconnected: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "black",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  disconnectedHost: {
+    width: "100%",
+    maxWidth: 420,
+  },
   captureFlash: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "#fff",
     zIndex: 100,
   },
@@ -341,22 +359,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 20,
     flexDirection: "column",
+    justifyContent: "space-between",
     zIndex: 10,
     alignItems: "center",
-    gap: 16,
-  },
-  lastThumbWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.85)",
-    backgroundColor: "#1a1a1a",
-  },
-  lastThumb: {
-    width: "100%",
-    height: "100%",
+    paddingVertical: 20,
   },
   rightNav: {
     position: "absolute",
@@ -374,9 +380,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   navButtonFallback: {
     backgroundColor: "rgba(144, 144, 144, 0.5)",
+  },
+  galleryThumb: {
+    width: 50,
+    height: 50,
   },
   chromeFallback: {
     backgroundColor: "rgba(144, 144, 144, 0.35)",
@@ -424,6 +435,6 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: "#ff4444",
+    backgroundColor: "#FFFFFF",
   },
 });

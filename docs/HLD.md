@@ -6,7 +6,7 @@
 
 | Plane | Transport | Role |
 | --- | --- | --- |
-| Control | WebSocket `:8888/ws` | Commands + status + `IMAGE_READY` notifies (FlatBuffers) |
+| Control | WebSocket `:8888/ws` | Commands + status + `IMAGE_READY` + exposure settings (FlatBuffers) |
 | Media | HTTP `:8080` | MJPEG live view (`/live.mjpeg`), preview snapshot (`/photo.jpg`), last-capture stills (`/captures/…`) |
 
 The **server** owns the USB camera session (libgphoto2). The **iOS client** never talks to the camera directly. MVP camera: **Canon EOS 5D Mark III**.
@@ -37,7 +37,7 @@ flowchart LR
 
   Camera["Canon 5D Mark III"]
 
-  WSCtx <-->|"FlatBuffers control + IMAGE_READY"| Hub
+  WSCtx <-->|"FlatBuffers control + IMAGE_READY + settings"| Hub
   Stream < -->|"MJPEG"| HTTP
   Gallery < -->|"GET /captures/{id}/…"| HTTP
   Hub --> Cam
@@ -90,22 +90,23 @@ flowchart LR
 | Component | Responsibility |
 | --- | --- |
 | Expo Router screens | Connection gate → viewfinder → gallery → app settings |
-| `WebSocketContext` | Connect, persist IP, encode/decode FlatBuffers, surface status + `lastImageReady` |
+| `WebSocketContext` | Connect, persist IP, encode/decode FlatBuffers, surface status + `lastImageReady` + camera exposure |
 | `CameraStream` | MJPEG via WebView; pinch/pan via Gesture Handler + Reanimated overlay |
 | `ViewfinderGlass` | `expo-glass-effect` HUD chrome (status, nav, capture) |
-| Viewfinder last-thumb | After `IMAGE_READY`, download still and show strip → gallery |
+| `ExposureControls` | Bottom ISO / TV / AV readout pill + expanding value rail (camera exposure, not app settings) |
+| Viewfinder last-thumb | After `IMAGE_READY`, download still and show it as the gallery button artwork |
 | Gallery | Auto-fetch on notify; manual fetch; local `expo-file-system` / `expo-image` cache |
-| `SettingsContext` | Local-only overlays (grid) |
+| `SettingsContext` / `settings.tsx` | **App-only** overlays (grid) — not camera ISO/Tv/Av |
 | Platform UI | Expo UI / SwiftUI forms for connection + app settings |
 
-**Not yet in product surface:** exposure UI, mDNS browse. Capture-notify is wired in demo and real code paths; verified under ~3s on travel-router Wi‑Fi with 5D III remains a live-bench exit criterion.
+**Not yet in product surface:** mDNS browse, tap-to-focus. Capture-notify and exposure settings are wired on the demo/sim path; verified under ~3s capture→thumb on travel-router Wi‑Fi with 5D III remains a live-bench exit criterion. Real gphoto2 available-choice enumeration still returns empty lists.
 
 ### 3.2 Server (`apps/server`)
 
 | Package | Responsibility |
 | --- | --- |
-| `server/` | HTTP MJPEG + capture routes + WebSocket hub (`IMAGE_READY` broadcast) |
-| `camera/` | `CameraController`, last-capture store, operation serialization, preview, settings helpers, mock |
+| `server/` | HTTP MJPEG + capture routes + WebSocket hub (`IMAGE_READY` + settings broadcast) |
+| `camera/` | `CameraController`, `SettingsController`, last-capture store, operation serialization, preview, mock |
 | `gphoto2/` | CGO bindings (capture path + file download) |
 | `discovery/` | mDNS registration (`_5dcontrol._tcp`) |
 
@@ -117,11 +118,16 @@ Source of truth: `control.fbs`.
 
 Current messages:
 
-- **Command:** `FOCUS`, `CAPTURE`, `QUERY_STATUS`
+- **Command:** `FOCUS`, `CAPTURE`, `QUERY_STATUS`, `QUERY_SETTINGS`, `QUERY_AVAILABLE_SETTINGS`, `SET_SETTING`
+  - `SET_SETTING` carries `setting_field` (`ISO` / `SHUTTER_SPEED` / `APERTURE` / `EXPOSURE_COMPENSATION`) + `setting_value` (string)
 - **Status:** `camera_connected`, `battery_level`
 - **ImageReady:** `image_id`, `thumb_path`, `full_path` (HTTP paths on `:8080`; client prepends `http://{ip}:8080`)
+- **CurrentSettings:** `shutter_speed`, `aperture`, `iso`, `exposure_compensation`
+- **AvailableSettings:** string lists for shutter / aperture / ISO / EC choices
 
-Expansion for settings must land in `.fbs` first, then regenerate Go/TS, then wire WS handlers and UI.
+Exposure rides FlatBuffers over WS (same plane as FOCUS/CAPTURE), not HTTP. After a successful `SET_SETTING`, the server broadcasts updated `CURRENT_SETTINGS`. Mock camera returns realistic choice lists; real camera can get/set config strings but `GetAvailableSettings` still returns empty lists until gphoto2 enumeration is finished.
+
+Further protocol expansion must land in `.fbs` first, then regenerate Go/TS, then wire WS handlers and UI.
 
 ## 4. Key runtime flows
 
@@ -137,7 +143,9 @@ sequenceDiagram
   User->>App: Enter server IPv4 (persisted)
   App->>WS: Connect ws://IP:8888/ws
   WS-->>App: Status (camera_connected, battery)
-  App->>App: Unlock viewfinder
+  App->>WS: QUERY_SETTINGS + QUERY_AVAILABLE_SETTINGS
+  WS-->>App: CURRENT_SETTINGS + AVAILABLE_SETTINGS
+  App->>App: Unlock viewfinder (+ exposure pill when values present)
   App->>HTTP: GET /live.mjpeg
   HTTP-->>App: MJPEG frames
 ```
@@ -162,14 +170,38 @@ sequenceDiagram
   WS-->>App: IMAGE_READY (id, thumb_path, full_path)
   App->>HTTP: GET /captures/{id}/full.jpg
   HTTP-->>App: JPEG bytes
-  App->>App: Gallery cache + viewfinder last-thumb
+  App->>App: Gallery cache + gallery-button last-thumb
 ```
 
 Single-controller policy (Mode A): only one iOS client should drive commands; additional control connections are out of policy for v1.
 
-### 4.3 Demo mode
+### 4.3 Change exposure (ISO / Tv / Av)
 
-`go run . -demo` substitutes `MockCamera`: synthetic MJPEG, fake battery/status, and a labeled “CAPTURED” still after shutter so the full notify → gallery path works without USB.
+```mermaid
+sequenceDiagram
+  participant App as Mobile app
+  participant WS as Server WS
+  participant Cam as SettingsController
+
+  App->>WS: COMMAND QUERY_SETTINGS
+  WS->>Cam: GetCurrentSettings
+  Cam-->>WS: current values
+  WS-->>App: CURRENT_SETTINGS
+  App->>WS: COMMAND QUERY_AVAILABLE_SETTINGS
+  WS->>Cam: GetAvailableSettings
+  Cam-->>WS: choice lists (mock; real often empty)
+  WS-->>App: AVAILABLE_SETTINGS
+  App->>WS: COMMAND SET_SETTING (field + value)
+  WS->>Cam: SetISO / SetShutterSpeed / SetAperture / …
+  Cam-->>WS: ok
+  WS-->>App: CURRENT_SETTINGS (broadcast)
+```
+
+The control is non-modal by design: a glass pill docked in the bottom thumb zone reads out ISO / TV / AV, and tapping a segment expands a horizontal rail that snaps through that field's `AVAILABLE_SETTINGS` list. `SET_SETTING` is sent when the rail settles, so scrubbing does not flood the serialized camera worker. Exposure values are enumerated, not continuous — the rail maps one detent per choice.
+
+### 4.4 Demo mode
+
+`go run . -demo` substitutes `MockCamera`: synthetic MJPEG, fake battery/status, labeled stills after shutter, and mutable exposure settings with realistic available lists — so capture→gallery and ISO/Tv/Av flows work without USB.
 
 ```mermaid
 flowchart TB

@@ -203,7 +203,50 @@ jest.mock("@expo/ui", () => {
   const Row = ({ children, ...props }) =>
     React.createElement(View, { testID: "expo-ui-row", ...props }, children);
 
-  const Spacer = () => React.createElement(View, { testID: "expo-ui-spacer" });
+  const Spacer = ({
+    flexible,
+    size,
+  }: { flexible?: boolean; size?: number } = {}) =>
+    React.createElement(View, {
+      testID: "expo-ui-spacer",
+      style: flexible
+        ? { flex: 1 }
+        : size != null
+          ? { width: size, height: size }
+          : undefined,
+    });
+
+  const BottomSheet = ({
+    children,
+    isPresented,
+    onDismiss,
+    testID,
+  }: {
+    children?: React.ReactNode;
+    isPresented: boolean;
+    onDismiss: () => void;
+    testID?: string;
+    snapPoints?: unknown;
+    contentPadding?: unknown;
+    containerColor?: string;
+    showDragIndicator?: boolean;
+  }) =>
+    isPresented
+      ? React.createElement(
+          View,
+          { testID: testID ?? "expo-ui-bottom-sheet" },
+          children,
+          React.createElement(
+            Pressable,
+            {
+              testID: "expo-ui-bottom-sheet-dismiss",
+              onPress: onDismiss,
+              accessibilityRole: "button",
+            },
+            React.createElement(Text, null, "Dismiss")
+          )
+        )
+      : null;
 
   const ExpoText = ({ children, ...props }) =>
     React.createElement(Text, props, children);
@@ -243,13 +286,19 @@ jest.mock("@expo/ui", () => {
     const items = React.Children.toArray(children)
       .filter((child) => React.isValidElement(child))
       .map((child) => child.props);
+    const id = testID ?? "expo-ui-picker";
+    // Settings page still looks up the legacy selected-label id.
+    const selectedLabelId =
+      id === "grid-type-picker"
+        ? "grid-type-selected-label"
+        : `${id}-selected`;
 
     return React.createElement(
       View,
-      { testID: testID ?? "expo-ui-picker" },
+      { testID: id },
       React.createElement(
         Text,
-        { testID: "grid-type-selected-label" },
+        { testID: selectedLabelId },
         items.find((item) => item.value === selectedValue)?.label ??
           String(selectedValue)
       ),
@@ -258,7 +307,10 @@ jest.mock("@expo/ui", () => {
           Pressable,
           {
             key: String(item.value),
-            testID: `grid-type-option-${item.value}`,
+            testID:
+              id === "grid-type-picker"
+                ? `grid-type-option-${item.value}`
+                : `${id}-option-${item.value}`,
             onPress: () => onValueChange?.(item.value),
             accessibilityRole: "button",
           },
@@ -268,6 +320,32 @@ jest.mock("@expo/ui", () => {
     );
   };
   Picker.Item = PickerItem;
+
+  const Slider = ({
+    value,
+    onValueChange,
+    min = 0,
+    max = 1,
+    step = 1,
+    disabled,
+    testID,
+  }) =>
+    React.createElement(Pressable, {
+      testID: testID ?? "expo-ui-slider",
+      accessibilityRole: "adjustable",
+      disabled,
+      // Tests jump to max by pressing — maps to the last stepped value.
+      onPress: () => {
+        if (disabled) return;
+        onValueChange?.(max);
+      },
+      // Allow tests / callers to fire a specific value.
+      onValueChange,
+      value,
+      min,
+      max,
+      step,
+    });
 
   return {
     Host,
@@ -279,6 +357,8 @@ jest.mock("@expo/ui", () => {
     TextInput: ExpoTextInput,
     Button,
     Picker,
+    Slider,
+    BottomSheet,
     useNativeState,
   };
 });
