@@ -163,13 +163,15 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     sendCommand(ControlType.CAPTURE);
 
-    flashOpacity.value = withSequence(
-      withTiming(1, { duration: 100 }),
-      withTiming(0, { duration: 200 }, (finished) => {
-        if (finished) {
-          runOnJS(notifyCaptureSuccess)();
-        }
-      })
+    flashOpacity.set(
+      withSequence(
+        withTiming(1, { duration: 100 }),
+        withTiming(0, { duration: 200 }, (finished) => {
+          if (finished) {
+            runOnJS(notifyCaptureSuccess)();
+          }
+        })
+      )
     );
   };
 

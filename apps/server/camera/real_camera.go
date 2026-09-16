@@ -31,7 +31,6 @@ type RealCamera struct {
 	isConnected    atomic.Bool
 	disconnectedCh chan struct{}
 	previewPaused  atomic.Bool // used by MockCamera embed; real path uses PreviewManager
-	previewMutex   sync.Mutex
 	batteryLevel   atomic.Uint32
 	batteryQuit    chan struct{}
 
@@ -111,7 +110,7 @@ func (manager *RealCamera) Connect() error {
 	}
 
 	if err := camera.Init(ctx); err != nil {
-		camera.Close()
+		_ = camera.Close()
 		ctx.Close()
 		return fmt.Errorf("failed to initialize camera: %w", err)
 	}
@@ -384,7 +383,7 @@ func (manager *RealCamera) downloadCaptureJPEG(path *gphoto2.CameraFilePath) ([]
 			if err != nil {
 				return nil, err
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 			if err := manager.camera.FileGet(path.Folder, path.Name, ft, file, manager.ctx); err != nil {
 				return nil, err
 			}
@@ -607,7 +606,7 @@ func (manager *RealCamera) RunCaptureLoop() {
 		log.Printf("failed to create CameraFile: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var frameCount int
 	var start = time.Now()

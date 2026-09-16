@@ -23,7 +23,7 @@ func TestWebSocketServer_BasicConnection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WebSocket upgrade failed: %v", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Send initial status
 		sendStatus(conn, camManager)
@@ -45,7 +45,7 @@ func TestWebSocketServer_BasicConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket connection failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Connection should be successful
 	if conn == nil {
@@ -83,7 +83,7 @@ func TestWebSocketServer_ConnectionClose(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WebSocket upgrade failed: %v", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Send initial status
 		sendStatus(conn, camManager)
@@ -130,7 +130,7 @@ func TestWebSocketServer_SendStatus(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WebSocket upgrade failed: %v", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Send status
 		sendStatus(conn, camManager)
@@ -143,7 +143,7 @@ func TestWebSocketServer_SendStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket connection failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Read message
 	_, data, err := conn.ReadMessage()
@@ -171,7 +171,7 @@ func TestWebSocketServer_MultipleConnections(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WebSocket upgrade failed: %v", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Send initial status
 		sendStatus(conn, camManager)
@@ -195,14 +195,14 @@ func TestWebSocketServer_MultipleConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("First WebSocket connection failed: %v", err)
 	}
-	defer conn1.Close()
+	defer func() { _ = conn1.Close() }()
 
 	// Second connection
 	conn2, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Second WebSocket connection failed: %v", err)
 	}
-	defer conn2.Close()
+	defer func() { _ = conn2.Close() }()
 
 	// Both connections should be successful
 	if conn1 == nil || conn2 == nil {

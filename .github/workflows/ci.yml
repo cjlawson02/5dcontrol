@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Optional Vercel Remote Cache (no-op when unset)
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  EXPO_NO_TELEMETRY: 1
+  CGO_ENABLED: "1"
+
+jobs:
+  ci:
+    name: Lint, Build, and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            apps/server/go.sum
+            packages/proto/go.sum
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgphoto2-dev \
+            pkg-config
+
+      - name: Install flatc
+        env:
+          FLATC_VERSION: v25.12.19
+        run: |
+          curl -fsSL "https://github.com/google/flatbuffers/releases/download/${FLATC_VERSION}/Linux.flatc.binary.g++-13.zip" \
+            -o /tmp/flatc.zip
+          unzip -qo /tmp/flatc.zip -d /tmp/flatc
+          sudo install -m 755 /tmp/flatc/flatc /usr/local/bin/flatc
+          flatc --version
+
+      - name: Cache Turbo
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # Go lint runs in the dedicated golangci job (annotations + caching).
+        run: npx turbo run lint --filter=!@5dcontrol/server
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  golangci:
+    name: Go Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            apps/server/go.sum
+            packages/proto/go.sum
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgphoto2-dev \
+            pkg-config
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: apps/server

@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMdnsBrowse } from "../hooks/useMdnsBrowse";
 import { formatIpv4Typing } from "../utils/formatIpv4";
 import { logger } from "../utils/logger";
+import { readNativeState, writeNativeState } from "../utils/nativeState";
 import { useWebSocketContext } from "./WebSocketContext";
 
 /** Android / web connection screen using Expo UI universal Form-style layout. */
@@ -19,17 +20,17 @@ const ConnectionPage: React.FC = () => {
   const { status, ip, connect } = useWebSocketContext();
   const { servers, supported, scanning, error, rescan } = useMdnsBrowse();
   const ipField = useNativeState(ip ?? "");
-  const previousIp = useRef(ipField.value);
+  const previousIp = useRef(readNativeState(ipField));
   const isLoading = status === "loading";
 
   logger.debug(
-    `ConnectionPage: Render - status: ${status}, ip: ${ip}, ipField: ${ipField.value}`
+    `ConnectionPage: Render - status: ${status}, ip: ${ip}, ipField: ${readNativeState(ipField)}`
   );
 
   useEffect(() => {
-    if (ip != null && ip !== ipField.value) {
+    if (ip != null && ip !== readNativeState(ipField)) {
       logger.debug(`ConnectionPage: IP changed, updating field to: ${ip}`);
-      ipField.value = ip;
+      writeNativeState(ipField, ip);
       previousIp.current = ip;
     }
   }, [ip, ipField]);
@@ -37,11 +38,11 @@ const ConnectionPage: React.FC = () => {
   const handleIpChange = (text: string) => {
     const formatted = formatIpv4Typing(text, previousIp.current);
     previousIp.current = formatted;
-    ipField.value = formatted;
+    writeNativeState(ipField, formatted);
   };
 
   const handleSubmit = async () => {
-    const newIp = ipField.value.trim().replace(/\.$/, "");
+    const newIp = readNativeState(ipField).trim().replace(/\.$/, "");
     logger.info(`ConnectionPage: Connect button clicked with IP: ${newIp}`);
     if (!newIp || isLoading) {
       return;

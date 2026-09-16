@@ -98,5 +98,5 @@ func runCompletionBench(demo bool, iters int) {
 		log.Fatalf("bench failed: %v", err)
 	}
 
-	fmt.Fprint(os.Stdout, report.Format())
+	_, _ = fmt.Fprint(os.Stdout, report.Format())
 }

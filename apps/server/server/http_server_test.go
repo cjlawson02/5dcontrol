@@ -83,7 +83,7 @@ func TestRunHTTPServer_MJPEG_NotConnected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, resp.StatusCode)
@@ -118,9 +118,9 @@ func TestRunHTTPServer_MJPEG_Connected(t *testing.T) {
 			frame := mockCam.GetLatestFrame()
 			if frame != nil {
 				header := fmt.Sprintf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame.Data))
-				w.Write([]byte(header))
-				w.Write(frame.Data)
-				w.Write([]byte("\r\n"))
+				_, _ = w.Write([]byte(header))
+				_, _ = w.Write(frame.Data)
+				_, _ = w.Write([]byte("\r\n"))
 			}
 		}
 	}))
@@ -131,7 +131,7 @@ func TestRunHTTPServer_MJPEG_Connected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -169,7 +169,7 @@ func TestRunHTTPServer_Photo_NotConnected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, resp.StatusCode)
@@ -197,7 +197,7 @@ func TestRunHTTPServer_Photo_NoFrame(t *testing.T) {
 
 			w.Header().Set("Content-Type", "image/jpeg")
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(frame.Data)))
-			w.Write(frame.Data)
+			_, _ = w.Write(frame.Data)
 		}
 	}))
 	defer server.Close()
@@ -207,7 +207,7 @@ func TestRunHTTPServer_Photo_NoFrame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, resp.StatusCode)
@@ -242,7 +242,7 @@ func TestRunHTTPServer_Photo_WithFrame(t *testing.T) {
 
 			w.Header().Set("Content-Type", "image/jpeg")
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(frame.Data)))
-			w.Write(frame.Data)
+			_, _ = w.Write(frame.Data)
 		}
 	}))
 	defer server.Close()
@@ -252,7 +252,7 @@ func TestRunHTTPServer_Photo_WithFrame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -310,9 +310,9 @@ func TestRunHTTPServer_MJPEG_ClientLifecycle(t *testing.T) {
 			frame := mockCam.GetLatestFrame()
 			if frame != nil {
 				header := fmt.Sprintf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame.Data))
-				w.Write([]byte(header))
-				w.Write(frame.Data)
-				w.Write([]byte("\r\n"))
+				_, _ = w.Write([]byte(header))
+				_, _ = w.Write(frame.Data)
+				_, _ = w.Write([]byte("\r\n"))
 			}
 		}
 	}))
@@ -323,7 +323,7 @@ func TestRunHTTPServer_MJPEG_ClientLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)
@@ -373,9 +373,9 @@ func TestRunHTTPServer_MJPEG_MultipartFormat(t *testing.T) {
 			frame := mockCam.GetLatestFrame()
 			if frame != nil {
 				header := fmt.Sprintf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame.Data))
-				w.Write([]byte(header))
-				w.Write(frame.Data)
-				w.Write([]byte("\r\n"))
+				_, _ = w.Write([]byte(header))
+				_, _ = w.Write(frame.Data)
+				_, _ = w.Write([]byte("\r\n"))
 			}
 		}
 	}))
@@ -386,7 +386,7 @@ func TestRunHTTPServer_MJPEG_MultipartFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)
@@ -423,7 +423,7 @@ func TestRunHTTPServer_UnknownEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
@@ -458,9 +458,9 @@ func TestRunHTTPServer_ConcurrentClients(t *testing.T) {
 			frame := mockCam.GetLatestFrame()
 			if frame != nil {
 				header := fmt.Sprintf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(frame.Data))
-				w.Write([]byte(header))
-				w.Write(frame.Data)
-				w.Write([]byte("\r\n"))
+				_, _ = w.Write([]byte(header))
+				_, _ = w.Write(frame.Data)
+				_, _ = w.Write([]byte("\r\n"))
 			}
 		}
 	}))
@@ -478,7 +478,7 @@ func TestRunHTTPServer_ConcurrentClients(t *testing.T) {
 				done <- false
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
@@ -580,7 +580,7 @@ func TestCapturesHTTPHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("full status %d", resp.StatusCode)
 	}
@@ -593,7 +593,7 @@ func TestCapturesHTTPHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("thumb status %d", resp2.StatusCode)
 	}
@@ -606,7 +606,7 @@ func TestCapturesHTTPHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 	if resp3.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404 for missing id, got %d", resp3.StatusCode)
 	}

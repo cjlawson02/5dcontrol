@@ -18,7 +18,7 @@ func TestWebSocketHandlers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to upgrade connection: %v", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		response := []byte("test response")
 		_ = conn.WriteMessage(websocket.TextMessage, response)
@@ -30,7 +30,7 @@ func TestWebSocketHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to test server: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	command := buildTestCommand(Proto.ControlTypeQUERY_STATUS)
 	err = conn.WriteMessage(websocket.BinaryMessage, command)

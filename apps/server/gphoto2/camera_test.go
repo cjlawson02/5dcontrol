@@ -20,7 +20,7 @@ func TestNewCamera_ErrorHandling(t *testing.T) {
 		}
 		// Clean up if we got a camera
 		if camera != nil {
-			camera.Close()
+			_ = camera.Close()
 		}
 	}
 	// If there's an error, that's expected in test environments without gphoto2
@@ -34,7 +34,7 @@ func TestCamera_Init_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -57,7 +57,7 @@ func TestCamera_CapturePreview_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -71,7 +71,7 @@ func TestCamera_CapturePreview_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera file: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	err = camera.CapturePreview(file, ctx)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestCamera_Capture_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -110,7 +110,7 @@ func TestCamera_File_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	file, err := camera.File()
 	if err != nil {
@@ -118,7 +118,7 @@ func TestCamera_File_ErrorHandling(t *testing.T) {
 		t.Logf("File creation failed as expected in test environment: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// If we got a file, it should be non-nil
 	if file == nil {
@@ -133,7 +133,7 @@ func TestCamera_Exit_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -171,7 +171,7 @@ func TestCamera_SetConfigValueString_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -194,7 +194,7 @@ func TestCamera_GetConfigValueString_ErrorHandling(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -222,7 +222,7 @@ func TestCamera_c_Method(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	cPtr := camera.c()
 	if cPtr == nil {
@@ -239,7 +239,7 @@ func TestCamera_Integration_WithContext(t *testing.T) {
 		t.Skipf("Skipping integration test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -261,7 +261,7 @@ func TestCamera_Integration_WithContext(t *testing.T) {
 		t.Logf("Integration test: File creation failed: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Try to capture preview
 	err = camera.CapturePreview(file, ctx)
@@ -294,7 +294,7 @@ func TestCamera_ConfigOperations(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -364,7 +364,7 @@ func TestCamera_ConcurrentAccess(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -406,7 +406,7 @@ func TestCamera_ErrorRecovery(t *testing.T) {
 		t.Skipf("Skipping test: failed to create camera: %v", err)
 		return
 	}
-	defer camera.Close()
+	defer func() { _ = camera.Close() }()
 
 	ctx := NewContext()
 	if ctx == nil {
@@ -423,7 +423,7 @@ func TestCamera_ErrorRecovery(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 			return camera.CapturePreview(file, ctx)
 		},
 		func() error { _, err := camera.Capture(ctx); return err },

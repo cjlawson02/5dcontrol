@@ -175,6 +175,13 @@ jest.mock("@expo/ui", () => {
           valRef.current = v;
           setVal(v);
         },
+        get() {
+          return valRef.current;
+        },
+        set(v) {
+          valRef.current = v;
+          setVal(v);
+        },
       };
     }
     return stateRef.current;
@@ -379,6 +386,13 @@ jest.mock("@expo/ui/swift-ui", () => {
           return valRef.current;
         },
         set value(v) {
+          valRef.current = v;
+          setVal(v);
+        },
+        get() {
+          return valRef.current;
+        },
+        set(v) {
           valRef.current = v;
           setVal(v);
         },

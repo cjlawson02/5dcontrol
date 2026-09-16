@@ -83,10 +83,10 @@ function ValueRail({
   // Frozen at mount. `contentOffset` is re-applied whenever it changes, so
   // deriving it from the live value would yank the scroll mid-drag. The rail
   // is keyed per field, so it remounts with the right value already centered.
-  const initialOffset = useRef({
+  const [initialOffset] = useState(() => ({
     x: indexOfOption(options, value) * ITEM_WIDTH,
     y: 0,
-  }).current;
+  }));
 
   const indexAt = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) =>

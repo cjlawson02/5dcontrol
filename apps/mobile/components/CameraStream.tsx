@@ -41,8 +41,8 @@ export function CameraStream({ url, onFrame, onTap }: Props) {
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
-      containerWidth.value = event.nativeEvent.layout.width;
-      containerHeight.value = event.nativeEvent.layout.height;
+      containerWidth.set(event.nativeEvent.layout.width);
+      containerHeight.set(event.nativeEvent.layout.height);
     },
     [containerWidth, containerHeight]
   );

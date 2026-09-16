@@ -47,7 +47,7 @@ func (r BenchReport) Format() string {
 		if !ok || len(timings) == 0 {
 			continue
 		}
-		b.WriteString(fmt.Sprintf("-- mode: %s (%d runs) --\n", mode, len(timings)))
+		fmt.Fprintf(&b, "-- mode: %s (%d runs) --\n", mode, len(timings))
 		var sumDone, sumCmd, sumEvt time.Duration
 		okCount := 0
 		evtCount := 0
@@ -64,7 +64,8 @@ func (r BenchReport) Format() string {
 					evtCount++
 				}
 			}
-			b.WriteString(fmt.Sprintf(
+			fmt.Fprintf(
+				&b,
 				"  #%d %s  done=%s  cmdReturn=%s  firstEvent=%s@%s  events=%v\n",
 				i+1,
 				status,
@@ -73,21 +74,23 @@ func (r BenchReport) Format() string {
 				t.FirstUsefulEvent,
 				t.FirstUsefulEventAt.Round(time.Millisecond),
 				t.EventsSeen,
-			))
+			)
 		}
 		if okCount > 0 {
-			b.WriteString(fmt.Sprintf(
+			fmt.Fprintf(
+				&b,
 				"  avg done=%s  avg cmdReturn=%s",
 				(sumDone / time.Duration(okCount)).Round(time.Millisecond),
 				(sumCmd / time.Duration(okCount)).Round(time.Millisecond),
-			))
+			)
 			if evtCount > 0 {
-				b.WriteString(fmt.Sprintf(
+				fmt.Fprintf(
+					&b,
 					"  avg firstEvent=%s",
 					(sumEvt / time.Duration(evtCount)).Round(time.Millisecond),
-				))
+				)
 			}
-			b.WriteString(fmt.Sprintf("  success=%d/%d\n", okCount, len(timings)))
+			fmt.Fprintf(&b, "  success=%d/%d\n", okCount, len(timings))
 		}
 		b.WriteString("\n")
 	}

@@ -142,10 +142,15 @@ const STORAGE_HTTP_PORT = "server_http_port";
 const DEFAULT_IP = "192.168.1.1";
 
 export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
-  const [status, setStatus] = useState<ConnectionStatus>("loading");
+  const isTestEnv = process.env.NODE_ENV === "test";
+  const [status, setStatus] = useState<ConnectionStatus>(
+    isTestEnv ? "disconnected" : "loading"
+  );
   const [cameraStatus, setCameraStatus] = useState<ConnectionStatus>("loading");
   const [batteryLevel, setBatteryLevel] = useState<number>(0);
-  const [ip, setInternalIp] = useState<string | null>(null);
+  const [ip, setInternalIp] = useState<string | null>(
+    isTestEnv ? DEFAULT_IP : null
+  );
   const [wsPort, setWsPort] = useState(DEFAULT_WS_PORT);
   const [httpPort, setHttpPort] = useState(DEFAULT_HTTP_PORT);
   const [connectionTrigger, setConnectionTrigger] = useState(0);
@@ -256,13 +261,46 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
   }, [setDisconnected]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "test") {
-      loadIp();
-    } else {
-      setInternalIp(DEFAULT_IP);
-      setDisconnected();
+    if (process.env.NODE_ENV === "test") {
+      return;
     }
-  }, [loadIp, setDisconnected]);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const savedIp = await AsyncStorage.getItem(STORAGE_KEY);
+        const savedWs = await AsyncStorage.getItem(STORAGE_WS_PORT);
+        const savedHttp = await AsyncStorage.getItem(STORAGE_HTTP_PORT);
+        if (cancelled) {
+          return;
+        }
+        // Prefill only — do not auto-connect until the user taps Connect.
+        setInternalIp(savedIp ?? DEFAULT_IP);
+        const resolved = resolveServerPorts({
+          wsPort: savedWs ? Number(savedWs) : undefined,
+          httpPort: savedHttp ? Number(savedHttp) : undefined,
+        });
+        setWsPort(resolved.wsPort);
+        setHttpPort(resolved.httpPort);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        logger.error(`WebSocket: Error loading IP from storage:`, error);
+        setInternalIp(DEFAULT_IP);
+        setWsPort(DEFAULT_WS_PORT);
+        setHttpPort(DEFAULT_HTTP_PORT);
+      } finally {
+        if (!cancelled) {
+          setDisconnected();
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setDisconnected]);
 
   useEffect(() => {
     // Wait for an explicit Connect/reconnect before opening a socket.

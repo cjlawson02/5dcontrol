@@ -159,7 +159,7 @@ func RunWebSocketServer(cam camera.CameraController, updates <-chan camera.Camer
 		}
 		defer func() {
 			hub.unregister <- conn
-			conn.Close()
+			_ = conn.Close()
 		}()
 
 		// Register client with hub

@@ -30,7 +30,7 @@ func startMockSettingsWSServer(t *testing.T, cam camera.CameraController) (*http
 			t.Errorf("upgrade failed: %v", err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		testHub.register <- conn
 		defer func() { testHub.unregister <- conn }()
