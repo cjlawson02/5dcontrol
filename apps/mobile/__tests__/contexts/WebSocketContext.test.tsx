@@ -22,10 +22,10 @@ describe("WebSocketContext", () => {
   );
 
   describe("WebSocketProvider", () => {
-    it("should provide initial loading state", () => {
+    it("should provide initial loading state", async () => {
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       // In test environment, initial state is set immediately
       expect(result.current.status).toBe("disconnected");
@@ -38,7 +38,7 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       // Manually call loadIp to test the function
       if (result.current.loadIp) {
@@ -56,7 +56,7 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       // Manually call loadIp to test the function
       if (result.current.loadIp) {
@@ -74,7 +74,7 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       // Manually call loadIp to test error handling
       if (result.current.loadIp) {
@@ -92,7 +92,7 @@ describe("WebSocketContext", () => {
     it("should update IP and save to storage", async () => {
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await act(async () => {
         result.current.setIp("192.168.1.200");
@@ -111,7 +111,7 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await act(async () => {
         result.current.setIp("192.168.1.200");
@@ -126,7 +126,7 @@ describe("WebSocketContext", () => {
     it("should trigger reconnection", async () => {
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       // Wait for initial load
       await waitFor(() => {
@@ -135,7 +135,7 @@ describe("WebSocketContext", () => {
 
       const initialTrigger = result.current.reconnect;
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -159,26 +159,26 @@ describe("WebSocketContext", () => {
       );
 
       const wrapper = createWrapper();
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
       await waitFor(() => {
         expect(mockWebSocket.onopen).toEqual(expect.any(Function));
       });
-      act(() => {
+      await act(() => {
         mockWebSocket.onopen?.();
       });
       await waitFor(() => {
         expect(result.current.status).toBe("connected");
       });
 
-      act(() => {
+      await act(() => {
         result.current.disconnect();
       });
 
@@ -204,13 +204,13 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -218,7 +218,7 @@ describe("WebSocketContext", () => {
         expect(global.WebSocket).toHaveBeenCalled();
       });
 
-      act(() => {
+      await act(() => {
         result.current.sendCommand(ControlType.FOCUS);
       });
 
@@ -228,7 +228,7 @@ describe("WebSocketContext", () => {
     it("should not send command when WebSocket is not available", async () => {
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
@@ -238,7 +238,7 @@ describe("WebSocketContext", () => {
       const originalWebSocket = global.WebSocket;
       global.WebSocket = jest.fn().mockImplementation(() => null) as any;
 
-      act(() => {
+      await act(() => {
         result.current.sendCommand(ControlType.FOCUS);
       });
 
@@ -250,14 +250,14 @@ describe("WebSocketContext", () => {
   });
 
   describe("useWebSocketContext hook", () => {
-    it("should throw error when used outside provider", () => {
+    it("should throw error when used outside provider", async () => {
       // Suppress console.error for this test
       const originalError = console.error;
       console.error = jest.fn();
 
-      expect(() => {
-        renderHook(() => useWebSocketContext());
-      }).toThrow("useWebSocketContext must be used within a WebSocketProvider");
+      await expect(renderHook(() => useWebSocketContext())).rejects.toThrow(
+        "useWebSocketContext must be used within a WebSocketProvider"
+      );
 
       console.error = originalError;
     });
@@ -280,13 +280,13 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -294,7 +294,7 @@ describe("WebSocketContext", () => {
         expect(mockWebSocket.onopen).toEqual(expect.any(Function));
       });
 
-      act(() => {
+      await act(() => {
         mockWebSocket.onopen?.();
       });
 
@@ -302,7 +302,7 @@ describe("WebSocketContext", () => {
         expect(result.current.status).toBe("connected");
       });
 
-      act(() => {
+      await act(() => {
         mockWebSocket.onclose?.({ code: 1000, reason: "Normal closure" });
       });
 
@@ -328,13 +328,13 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -342,7 +342,7 @@ describe("WebSocketContext", () => {
         expect(mockWebSocket.onerror).toEqual(expect.any(Function));
       });
 
-      act(() => {
+      await act(() => {
         mockWebSocket.onerror?.(new Error("Connection failed"));
       });
 
@@ -378,13 +378,13 @@ describe("WebSocketContext", () => {
 
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -433,13 +433,13 @@ describe("WebSocketContext", () => {
       );
 
       const wrapper = createWrapper();
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -475,13 +475,13 @@ describe("WebSocketContext", () => {
       );
 
       const wrapper = createWrapper();
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");
       });
 
-      act(() => {
+      await act(() => {
         result.current.reconnect();
       });
 
@@ -489,7 +489,7 @@ describe("WebSocketContext", () => {
         expect(global.WebSocket).toHaveBeenCalled();
       });
 
-      act(() => {
+      await act(() => {
         result.current.setCameraSetting(SettingField.ISO, "800");
       });
 
@@ -499,7 +499,7 @@ describe("WebSocketContext", () => {
     it("should close existing connection before creating new one", async () => {
       const wrapper = createWrapper();
 
-      const { result } = renderHook(() => useWebSocketContext(), { wrapper });
+      const { result } = await renderHook(() => useWebSocketContext(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.ip).toBe("192.168.1.1");

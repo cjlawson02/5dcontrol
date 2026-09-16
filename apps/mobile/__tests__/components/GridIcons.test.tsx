@@ -23,31 +23,31 @@ jest.mock("react-native-svg", () => {
 
 describe("GridIcons", () => {
   describe("NoGridIcon", () => {
-    it("should render correctly with default props", () => {
-      const { getByTestId, getAllByTestId } = render(<NoGridIcon />);
+    it("should render correctly with default props", async () => {
+      const { getByTestId, getAllByTestId } = await render(<NoGridIcon />);
 
       expect(getByTestId("svg")).toBeTruthy();
       expect(getByTestId("circle")).toBeTruthy();
       expect(getAllByTestId("line")).toHaveLength(2);
     });
 
-    it("should render with custom size", () => {
-      const { getByTestId } = render(<NoGridIcon size={30} />);
+    it("should render with custom size", async () => {
+      const { getByTestId } = await render(<NoGridIcon size={30} />);
 
       const svg = getByTestId("svg");
       expect(svg.props.width).toBe(30);
       expect(svg.props.height).toBe(30);
     });
 
-    it("should render with custom color", () => {
-      const { getByTestId } = render(<NoGridIcon color="#ff0000" />);
+    it("should render with custom color", async () => {
+      const { getByTestId } = await render(<NoGridIcon color="#ff0000" />);
 
       const circle = getByTestId("circle");
       expect(circle.props.stroke).toBe("#ff0000");
     });
 
-    it("should render with custom size and color", () => {
-      const { getByTestId } = render(<NoGridIcon size={40} color="#00ff00" />);
+    it("should render with custom size and color", async () => {
+      const { getByTestId } = await render(<NoGridIcon size={40} color="#00ff00" />);
 
       const svg = getByTestId("svg");
       const circle = getByTestId("circle");
@@ -57,8 +57,8 @@ describe("GridIcons", () => {
       expect(circle.props.stroke).toBe("#00ff00");
     });
 
-    it("should render multiple lines for the X pattern", () => {
-      const { getAllByTestId } = render(<NoGridIcon />);
+    it("should render multiple lines for the X pattern", async () => {
+      const { getAllByTestId } = await render(<NoGridIcon />);
 
       const lines = getAllByTestId("line");
       expect(lines).toHaveLength(2);
@@ -66,23 +66,23 @@ describe("GridIcons", () => {
   });
 
   describe("RuleOfThirdsIcon", () => {
-    it("should render correctly with default props", () => {
-      const { getByTestId, getAllByTestId } = render(<RuleOfThirdsIcon />);
+    it("should render correctly with default props", async () => {
+      const { getByTestId, getAllByTestId } = await render(<RuleOfThirdsIcon />);
 
       expect(getByTestId("svg")).toBeTruthy();
       expect(getAllByTestId("line")).toHaveLength(4);
     });
 
-    it("should render with custom size", () => {
-      const { getByTestId } = render(<RuleOfThirdsIcon size={30} />);
+    it("should render with custom size", async () => {
+      const { getByTestId } = await render(<RuleOfThirdsIcon size={30} />);
 
       const svg = getByTestId("svg");
       expect(svg.props.width).toBe(30);
       expect(svg.props.height).toBe(30);
     });
 
-    it("should render with custom color", () => {
-      const { getAllByTestId } = render(<RuleOfThirdsIcon color="#ff0000" />);
+    it("should render with custom color", async () => {
+      const { getAllByTestId } = await render(<RuleOfThirdsIcon color="#ff0000" />);
 
       const lines = getAllByTestId("line");
       lines.forEach((line) => {
@@ -90,8 +90,8 @@ describe("GridIcons", () => {
       });
     });
 
-    it("should render with custom size and color", () => {
-      const { getByTestId, getAllByTestId } = render(
+    it("should render with custom size and color", async () => {
+      const { getByTestId, getAllByTestId } = await render(
         <RuleOfThirdsIcon size={40} color="#00ff00" />
       );
 
@@ -105,8 +105,8 @@ describe("GridIcons", () => {
       });
     });
 
-    it("should render exactly 4 lines for rule of thirds grid", () => {
-      const { getAllByTestId } = render(<RuleOfThirdsIcon />);
+    it("should render exactly 4 lines for rule of thirds grid", async () => {
+      const { getAllByTestId } = await render(<RuleOfThirdsIcon />);
 
       const lines = getAllByTestId("line");
       expect(lines).toHaveLength(4);
@@ -114,23 +114,23 @@ describe("GridIcons", () => {
   });
 
   describe("GoldenRatioIcon", () => {
-    it("should render correctly with default props", () => {
-      const { getByTestId, getAllByTestId } = render(<GoldenRatioIcon />);
+    it("should render correctly with default props", async () => {
+      const { getByTestId, getAllByTestId } = await render(<GoldenRatioIcon />);
 
       expect(getByTestId("svg")).toBeTruthy();
       expect(getAllByTestId("line")).toHaveLength(4);
     });
 
-    it("should render with custom size", () => {
-      const { getByTestId } = render(<GoldenRatioIcon size={30} />);
+    it("should render with custom size", async () => {
+      const { getByTestId } = await render(<GoldenRatioIcon size={30} />);
 
       const svg = getByTestId("svg");
       expect(svg.props.width).toBe(30);
       expect(svg.props.height).toBe(30);
     });
 
-    it("should render with custom color", () => {
-      const { getAllByTestId } = render(<GoldenRatioIcon color="#ff0000" />);
+    it("should render with custom color", async () => {
+      const { getAllByTestId } = await render(<GoldenRatioIcon color="#ff0000" />);
 
       const lines = getAllByTestId("line");
       lines.forEach((line) => {
@@ -138,8 +138,8 @@ describe("GridIcons", () => {
       });
     });
 
-    it("should render with custom size and color", () => {
-      const { getByTestId, getAllByTestId } = render(
+    it("should render with custom size and color", async () => {
+      const { getByTestId, getAllByTestId } = await render(
         <GoldenRatioIcon size={40} color="#00ff00" />
       );
 
@@ -153,8 +153,8 @@ describe("GridIcons", () => {
       });
     });
 
-    it("should render exactly 4 lines for golden ratio grid", () => {
-      const { getAllByTestId } = render(<GoldenRatioIcon />);
+    it("should render exactly 4 lines for golden ratio grid", async () => {
+      const { getAllByTestId } = await render(<GoldenRatioIcon />);
 
       const lines = getAllByTestId("line");
       expect(lines).toHaveLength(4);
@@ -162,24 +162,24 @@ describe("GridIcons", () => {
   });
 
   describe("All Icons", () => {
-    it("should handle zero size gracefully", () => {
-      const { getByTestId } = render(<NoGridIcon size={0} />);
+    it("should handle zero size gracefully", async () => {
+      const { getByTestId } = await render(<NoGridIcon size={0} />);
 
       const svg = getByTestId("svg");
       expect(svg.props.width).toBe(0);
       expect(svg.props.height).toBe(0);
     });
 
-    it("should handle very large size", () => {
-      const { getByTestId } = render(<RuleOfThirdsIcon size={1000} />);
+    it("should handle very large size", async () => {
+      const { getByTestId } = await render(<RuleOfThirdsIcon size={1000} />);
 
       const svg = getByTestId("svg");
       expect(svg.props.width).toBe(1000);
       expect(svg.props.height).toBe(1000);
     });
 
-    it("should handle undefined color", () => {
-      const { getByTestId } = render(
+    it("should handle undefined color", async () => {
+      const { getByTestId } = await render(
         <GoldenRatioIcon color={undefined as any} />
       );
 
@@ -187,14 +187,14 @@ describe("GridIcons", () => {
       expect(getByTestId("svg")).toBeTruthy();
     });
 
-    it("should handle empty string color", () => {
-      const { getByTestId } = render(<NoGridIcon color="" />);
+    it("should handle empty string color", async () => {
+      const { getByTestId } = await render(<NoGridIcon color="" />);
 
       // Should not crash
       expect(getByTestId("svg")).toBeTruthy();
     });
 
-    it("should handle special characters in color", () => {
+    it("should handle special characters in color", async () => {
       const specialColors = [
         "#fff",
         "#000",
@@ -204,10 +204,10 @@ describe("GridIcons", () => {
         "transparent",
       ];
 
-      specialColors.forEach((color) => {
-        const { getByTestId } = render(<RuleOfThirdsIcon color={color} />);
+      for (const color of specialColors) {
+        const { getByTestId } = await render(<RuleOfThirdsIcon color={color} />);
         expect(getByTestId("svg")).toBeTruthy();
-      });
+      }
     });
   });
 });

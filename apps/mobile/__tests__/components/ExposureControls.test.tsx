@@ -23,8 +23,8 @@ describe("ExposureControls", () => {
     exposureCompensations: ["-1", "0", "+1"],
   };
 
-  it("renders the ISO / Tv / Av readout pill", () => {
-    render(
+  it("renders the ISO / Tv / Av readout pill", async () => {
+    await render(
       <ExposureControls
         current={current}
         available={available}
@@ -39,9 +39,9 @@ describe("ExposureControls", () => {
     expect(screen.queryByTestId("exposure-rail")).toBeNull();
   });
 
-  it("arms a segment, sets a value from the rail, and closes on scrim tap", () => {
+  it("arms a segment, sets a value from the rail, and closes on scrim tap", async () => {
     const onSet = jest.fn();
-    render(
+    await render(
       <ExposureControls
         current={current}
         available={available}
@@ -49,18 +49,18 @@ describe("ExposureControls", () => {
       />
     );
 
-    fireEvent.press(screen.getByTestId("exposure-iso-chip"));
+    await fireEvent.press(screen.getByTestId("exposure-iso-chip"));
     expect(screen.getByTestId("exposure-rail")).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId("exposure-rail-option-800"));
+    await fireEvent.press(screen.getByTestId("exposure-rail-option-800"));
     expect(onSet).toHaveBeenCalledWith(SettingField.ISO, "800");
 
-    fireEvent.press(screen.getByTestId("exposure-scrim"));
+    await fireEvent.press(screen.getByTestId("exposure-scrim"));
     expect(screen.queryByTestId("exposure-rail")).toBeNull();
   });
 
-  it("collapses the rail when the armed segment is tapped again", () => {
-    render(
+  it("collapses the rail when the armed segment is tapped again", async () => {
+    await render(
       <ExposureControls
         current={current}
         available={available}
@@ -68,15 +68,15 @@ describe("ExposureControls", () => {
       />
     );
 
-    fireEvent.press(screen.getByTestId("exposure-shutter-chip"));
+    await fireEvent.press(screen.getByTestId("exposure-shutter-chip"));
     expect(screen.getByTestId("exposure-rail")).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId("exposure-shutter-chip"));
+    await fireEvent.press(screen.getByTestId("exposure-shutter-chip"));
     expect(screen.queryByTestId("exposure-rail")).toBeNull();
   });
 
-  it("renders nothing without current settings", () => {
-    const { toJSON } = render(
+  it("renders nothing without current settings", async () => {
+    const { toJSON } = await render(
       <ExposureControls current={null} available={available} onSet={jest.fn()} />
     );
     expect(toJSON()).toBeNull();

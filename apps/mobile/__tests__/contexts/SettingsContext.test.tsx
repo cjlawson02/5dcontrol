@@ -17,12 +17,12 @@ describe("SettingsContext", () => {
   });
 
   describe("SettingsProvider", () => {
-    it("should provide initial state with default grid type", () => {
+    it("should provide initial state with default grid type", async () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       expect(result.current.state.gridType).toBe("none");
     });
@@ -52,7 +52,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       await act(async () => {
         await result.current.setGridType("rule-of-thirds");
@@ -71,7 +71,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       await act(async () => {
         await result.current.setGridType("golden-ratio");
@@ -90,7 +90,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       // First set to rule-of-thirds
       await act(async () => {
@@ -113,7 +113,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       await act(async () => {
         await result.current.setGridType("rule-of-thirds");
@@ -128,10 +128,10 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       // State should be updated immediately, not waiting for storage
-      act(() => {
+      await act(() => {
         result.current.setGridType("rule-of-thirds");
       });
 
@@ -140,14 +140,14 @@ describe("SettingsContext", () => {
   });
 
   describe("settingsReducer", () => {
-    it("should handle SET_GRID_TYPE action", () => {
+    it("should handle SET_GRID_TYPE action", async () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
-      act(() => {
+      await act(() => {
         result.current.setGridType("golden-ratio");
       });
 
@@ -159,10 +159,10 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       // Test the LOAD_SETTINGS action directly
-      act(() => {
+      await act(() => {
         result.current.dispatch?.({
           type: "LOAD_SETTINGS",
           payload: { gridType: "rule-of-thirds" },
@@ -180,7 +180,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       // Manually call loadSettings to test error handling
       if (result.current.loadSettings) {
@@ -193,17 +193,17 @@ describe("SettingsContext", () => {
       expect(result.current.state.gridType).toBe("none");
     });
 
-    it("should return current state for unknown action", () => {
+    it("should return current state for unknown action", async () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       const initialState = result.current.state;
 
       // Test unknown action type
-      act(() => {
+      await act(() => {
         result.current.dispatch?.({
           type: "UNKNOWN_ACTION" as any,
           payload: { gridType: "rule-of-thirds" },
@@ -216,14 +216,14 @@ describe("SettingsContext", () => {
   });
 
   describe("useSettings hook", () => {
-    it("should throw error when used outside provider", () => {
+    it("should throw error when used outside provider", async () => {
       // Suppress console.error for this test
       const originalError = console.error;
       console.error = jest.fn();
 
-      expect(() => {
-        renderHook(() => useSettings());
-      }).toThrow("useSettings must be used within a SettingsProvider");
+      await expect(renderHook(() => useSettings())).rejects.toThrow(
+        "useSettings must be used within a SettingsProvider"
+      );
 
       console.error = originalError;
     });
@@ -235,7 +235,7 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       const validGridTypes: GridType[] = [
         "none",
@@ -259,18 +259,18 @@ describe("SettingsContext", () => {
         <SettingsProvider>{children}</SettingsProvider>
       );
 
-      const { result } = renderHook(() => useSettings(), { wrapper });
+      const { result } = await renderHook(() => useSettings(), { wrapper });
 
       // Rapid state updates
-      act(() => {
+      await act(() => {
         result.current.setGridType("rule-of-thirds");
       });
 
-      act(() => {
+      await act(() => {
         result.current.setGridType("golden-ratio");
       });
 
-      act(() => {
+      await act(() => {
         result.current.setGridType("none");
       });
 

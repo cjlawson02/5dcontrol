@@ -17,10 +17,7 @@
     "test:all": "turbo run test:all"
   },
   "devDependencies": {
-    "turbo": "^2.10.12"
-  },
-  "overrides": {
-    "react-test-renderer": "19.2.3"
+    "turbo": "^2.10.13"
   },
   "private": true
 }

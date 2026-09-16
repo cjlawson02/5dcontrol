@@ -42,8 +42,8 @@ describe("SettingsPage", () => {
     mockSettingsContext.state.gridType = "none";
   });
 
-  it("should render correctly", () => {
-    const { getByText, getByTestId } = render(
+  it("should render correctly", async () => {
+    const { getByText, getByTestId } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -59,10 +59,10 @@ describe("SettingsPage", () => {
     );
   });
 
-  it("should display the current grid type", () => {
+  it("should display the current grid type", async () => {
     mockSettingsContext.state.gridType = "rule-of-thirds";
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -74,13 +74,13 @@ describe("SettingsPage", () => {
   });
 
   it("should call setGridType when a grid option is selected", async () => {
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    fireEvent.press(getByTestId("grid-type-option-rule-of-thirds"));
+    await fireEvent.press(getByTestId("grid-type-option-rule-of-thirds"));
 
     await waitFor(() => {
       expect(mockSettingsContext.setGridType).toHaveBeenCalledWith(
@@ -89,33 +89,33 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("should handle all grid types", () => {
+  it("should handle all grid types", async () => {
     const expectedNames = {
       none: "No Grid",
       "rule-of-thirds": "Rule of Thirds",
       "golden-ratio": "Golden Ratio",
     } as const;
 
-    (Object.keys(expectedNames) as (keyof typeof expectedNames)[]).forEach(
-      (gridType) => {
-        mockSettingsContext.state.gridType = gridType;
+    for (const gridType of Object.keys(
+      expectedNames
+    ) as (keyof typeof expectedNames)[]) {
+      mockSettingsContext.state.gridType = gridType;
 
-        const { getByTestId, unmount } = render(
-          <TestWrapper>
-            <SettingsPage />
-          </TestWrapper>
-        );
+      const { getByTestId, unmount } = await render(
+        <TestWrapper>
+          <SettingsPage />
+        </TestWrapper>
+      );
 
-        expect(getByTestId("grid-type-selected-label").props.children).toBe(
-          expectedNames[gridType]
-        );
-        unmount();
-      }
-    );
+      expect(getByTestId("grid-type-selected-label").props.children).toBe(
+        expectedNames[gridType]
+      );
+      await unmount();
+    }
   });
 
   it("should select each grid option", async () => {
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
@@ -131,7 +131,7 @@ describe("SettingsPage", () => {
     ];
 
     for (const option of options) {
-      fireEvent.press(getByTestId(option.testID));
+      await fireEvent.press(getByTestId(option.testID));
       await waitFor(() => {
         expect(mockSettingsContext.setGridType).toHaveBeenCalledWith(
           option.value
@@ -140,21 +140,21 @@ describe("SettingsPage", () => {
     }
   });
 
-  it("should navigate back when back is pressed", () => {
-    const { getByText } = render(
+  it("should navigate back when back is pressed", async () => {
+    const { getByText } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>
     );
 
-    fireEvent.press(getByText("← Back"));
+    await fireEvent.press(getByText("← Back"));
     expect(router.back).toHaveBeenCalled();
   });
 
-  it("should handle missing grid type gracefully", () => {
+  it("should handle missing grid type gracefully", async () => {
     mockSettingsContext.state.gridType = undefined;
 
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId } = await render(
       <TestWrapper>
         <SettingsPage />
       </TestWrapper>

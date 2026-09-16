@@ -66,7 +66,7 @@ describe("GalleryScreen", () => {
   });
 
   it("renders empty state and fetch control", async () => {
-    const { getByText, getByTestId } = render(<GalleryScreen />);
+    const { getByText, getByTestId } = await render(<GalleryScreen />);
 
     await waitFor(() => {
       expect(getByText("Gallery")).toBeTruthy();
@@ -76,9 +76,9 @@ describe("GalleryScreen", () => {
   });
 
   it("navigates back", async () => {
-    const { getByText } = render(<GalleryScreen />);
+    const { getByText } = await render(<GalleryScreen />);
     await waitFor(() => expect(getByText("← Back")).toBeTruthy());
-    fireEvent.press(getByText("← Back"));
+    await fireEvent.press(getByText("← Back"));
     expect(router.back).toHaveBeenCalled();
   });
 
@@ -97,11 +97,11 @@ describe("GalleryScreen", () => {
       .mockReturnValueOnce([])
       .mockReturnValueOnce([downloaded]);
 
-    const { getByTestId, queryByTestId } = render(<GalleryScreen />);
+    const { getByTestId, queryByTestId } = await render(<GalleryScreen />);
 
     await waitFor(() => expect(getByTestId("gallery-empty")).toBeTruthy());
 
-    fireEvent.press(getByTestId("gallery-fetch-latest"));
+    await fireEvent.press(getByTestId("gallery-fetch-latest"));
 
     await waitFor(() => {
       expect(galleryCache.downloadLatestSnapshot).toHaveBeenCalledWith(
@@ -119,10 +119,10 @@ describe("GalleryScreen", () => {
       new Error("offline")
     );
 
-    const { getByTestId } = render(<GalleryScreen />);
+    const { getByTestId } = await render(<GalleryScreen />);
     await waitFor(() => expect(getByTestId("gallery-fetch-latest")).toBeTruthy());
 
-    fireEvent.press(getByTestId("gallery-fetch-latest"));
+    await fireEvent.press(getByTestId("gallery-fetch-latest"));
 
     await waitFor(() => {
       expect(getByTestId("gallery-error")).toBeTruthy();

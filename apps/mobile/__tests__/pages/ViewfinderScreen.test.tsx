@@ -101,10 +101,10 @@ describe("Viewfinder tap-to-focus", () => {
     jest.useRealTimers();
   });
 
-  it("places the focus reticle and sends FOCUS with normalized coords", () => {
-    const { getByTestId } = render(<HomeScreen />);
+  it("places the focus reticle and sends FOCUS with normalized coords", async () => {
+    const { getByTestId } = await render(<HomeScreen />);
 
-    fireEvent.press(getByTestId("camera-stream"));
+    await fireEvent.press(getByTestId("camera-stream"));
 
     expect(getByTestId("focus-indicator")).toBeTruthy();
     expect(mockSendCommand).toHaveBeenCalledWith(ControlType.FOCUS, {
@@ -112,20 +112,20 @@ describe("Viewfinder tap-to-focus", () => {
       y: 0.2,
     });
 
-    act(() => {
+    await act(() => {
       jest.advanceTimersByTime(800);
     });
   });
 
-  it("reconnects and disconnects from the connection HUD", () => {
-    const { getByTestId } = render(<HomeScreen />);
+  it("reconnects and disconnects from the connection HUD", async () => {
+    const { getByTestId } = await render(<HomeScreen />);
 
-    fireEvent.press(getByTestId("connection-hud-toggle"));
-    fireEvent.press(getByTestId("connection-hud-reconnect"));
+    await fireEvent.press(getByTestId("connection-hud-toggle"));
+    await fireEvent.press(getByTestId("connection-hud-reconnect"));
     expect(mockReconnect).toHaveBeenCalled();
 
-    fireEvent.press(getByTestId("connection-hud-toggle"));
-    fireEvent.press(getByTestId("connection-hud-disconnect"));
+    await fireEvent.press(getByTestId("connection-hud-toggle"));
+    await fireEvent.press(getByTestId("connection-hud-disconnect"));
     expect(mockDisconnect).toHaveBeenCalled();
   });
 });

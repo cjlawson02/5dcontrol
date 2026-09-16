@@ -63,8 +63,8 @@ describe("ConnectionPage", () => {
     mockMdnsBrowse.error = null;
   });
 
-  it("should render correctly", () => {
-    const { getByText, getByPlaceholderText, getByDisplayValue } = render(
+  it("should render correctly", async () => {
+    const { getByText, getByPlaceholderText, getByDisplayValue } = await render(
       <ConnectionPage />
     );
 
@@ -74,41 +74,41 @@ describe("ConnectionPage", () => {
     expect(getByText("Connect")).toBeTruthy();
   });
 
-  it("should display current IP in input field", () => {
-    const { getByDisplayValue } = render(<ConnectionPage />);
+  it("should display current IP in input field", async () => {
+    const { getByDisplayValue } = await render(<ConnectionPage />);
 
     expect(getByDisplayValue("192.168.1.1")).toBeTruthy();
   });
 
-  it("should update input field when IP changes", () => {
-    const { rerender, getByDisplayValue } = render(<ConnectionPage />);
+  it("should update input field when IP changes", async () => {
+    const { rerender, getByDisplayValue } = await render(<ConnectionPage />);
 
     expect(getByDisplayValue("192.168.1.1")).toBeTruthy();
 
     // Simulate IP change
     mockWebSocketContext.ip = "192.168.1.100";
-    rerender(<ConnectionPage />);
+    await rerender(<ConnectionPage />);
 
     expect(getByDisplayValue("192.168.1.100")).toBeTruthy();
   });
 
-  it("should handle input text changes", () => {
-    const { getByDisplayValue } = render(<ConnectionPage />);
+  it("should handle input text changes", async () => {
+    const { getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
-    fireEvent.changeText(input, "192.168.1.200");
+    await fireEvent.changeText(input, "192.168.1.200");
 
     expect(getByDisplayValue("192.168.1.200")).toBeTruthy();
   });
 
   it("should call connect when connect button is pressed with a new IP", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, "192.168.1.200");
-    fireEvent.press(connectButton);
+    await fireEvent.changeText(input, "192.168.1.200");
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.200");
@@ -116,11 +116,11 @@ describe("ConnectionPage", () => {
   });
 
   it("should call connect when IP is the same and connect button is pressed", async () => {
-    const { getByText } = render(<ConnectionPage />);
+    const { getByText } = await render(<ConnectionPage />);
 
     const connectButton = getByText("Connect");
 
-    fireEvent.press(connectButton);
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.1");
@@ -128,13 +128,13 @@ describe("ConnectionPage", () => {
   });
 
   it("should trim whitespace from IP input", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, "  192.168.1.200  ");
-    fireEvent.press(connectButton);
+    await fireEvent.changeText(input, "  192.168.1.200  ");
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.200");
@@ -142,67 +142,67 @@ describe("ConnectionPage", () => {
   });
 
   it("should not connect when IP input is empty", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, "");
-    fireEvent.press(connectButton);
+    await fireEvent.changeText(input, "");
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).not.toHaveBeenCalled();
     });
   });
 
-  it("should disable input when status is loading", () => {
+  it("should disable input when status is loading", async () => {
     mockWebSocketContext.status = "loading";
 
-    const { getByDisplayValue, getByText } = render(<ConnectionPage />);
+    const { getByDisplayValue, getByText } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     expect(input.props.editable).toBe(false);
     expect(getByText("Connecting…")).toBeTruthy();
   });
 
-  it("should enable input when status is not loading", () => {
+  it("should enable input when status is not loading", async () => {
     mockWebSocketContext.status = "disconnected";
 
-    const { getByDisplayValue } = render(<ConnectionPage />);
+    const { getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     expect(input.props.editable).toBe(true);
   });
 
-  it("should handle keyboard dismiss when touching outside", () => {
-    const { getByTestId } = render(<ConnectionPage />);
+  it("should handle keyboard dismiss when touching outside", async () => {
+    const { getByTestId } = await render(<ConnectionPage />);
 
     const container = getByTestId("connection-container");
-    fireEvent.press(container);
+    await fireEvent.press(container);
 
     // Should not throw error
-    expect(() => fireEvent.press(container)).not.toThrow();
+    await expect(fireEvent.press(container)).resolves.toBeUndefined();
   });
 
   it("should handle different IP formats", async () => {
     const testIPs = ["10.0.0.1", "172.16.0.1", "8.8.8.8"];
 
     for (const ip of testIPs) {
-      const { getByText, getByDisplayValue, unmount } = render(
+      const { getByText, getByDisplayValue, unmount } = await render(
         <ConnectionPage />
       );
 
       const input = getByDisplayValue("192.168.1.1");
       const connectButton = getByText("Connect");
 
-      fireEvent.changeText(input, ip);
-      fireEvent.press(connectButton);
+      await fireEvent.changeText(input, ip);
+      await fireEvent.press(connectButton);
 
       await waitFor(() => {
         expect(mockWebSocketContext.connect).toHaveBeenCalledWith(ip);
       });
 
-      unmount();
+      await unmount();
       jest.clearAllMocks();
       mockWebSocketContext.connect.mockResolvedValue(undefined);
       mockWebSocketContext.ip = "192.168.1.1";
@@ -210,13 +210,13 @@ describe("ConnectionPage", () => {
   });
 
   it("should clamp long input to four octets", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, "192.168.1.100.50");
-    fireEvent.press(connectButton);
+    await fireEvent.changeText(input, "192.168.1.100.50");
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.100");
@@ -224,13 +224,13 @@ describe("ConnectionPage", () => {
   });
 
   it("should strip non-IP characters", async () => {
-    const { getByText, getByDisplayValue } = render(<ConnectionPage />);
+    const { getByText, getByDisplayValue } = await render(<ConnectionPage />);
 
     const input = getByDisplayValue("192.168.1.1");
     const connectButton = getByText("Connect");
 
-    fireEvent.changeText(input, "192.168.1.1:8080");
-    fireEvent.press(connectButton);
+    await fireEvent.changeText(input, "192.168.1.1:8080");
+    await fireEvent.press(connectButton);
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith("192.168.1.180");
@@ -247,10 +247,10 @@ describe("ConnectionPage", () => {
       },
     ];
 
-    const { getByText } = render(<ConnectionPage />);
+    const { getByText } = await render(<ConnectionPage />);
 
     expect(getByText("Nearby servers")).toBeTruthy();
-    fireEvent.press(getByText("5DControl (192.168.1.50)"));
+    await fireEvent.press(getByText("5DControl (192.168.1.50)"));
 
     await waitFor(() => {
       expect(mockWebSocketContext.connect).toHaveBeenCalledWith(
@@ -260,18 +260,18 @@ describe("ConnectionPage", () => {
     });
   });
 
-  it("explains missing browse when the native module is unavailable", () => {
+  it("explains missing browse when the native module is unavailable", async () => {
     mockMdnsBrowse.supported = false;
-    const { getByText } = render(<ConnectionPage />);
+    const { getByText } = await render(<ConnectionPage />);
     expect(getByText(/dev client/i)).toBeTruthy();
     expect(getByText("Connect")).toBeTruthy();
   });
 
-  it("explains empty browse results", () => {
+  it("explains empty browse results", async () => {
     mockMdnsBrowse.supported = true;
     mockMdnsBrowse.scanning = false;
     mockMdnsBrowse.servers = [];
-    const { getByText } = render(<ConnectionPage />);
+    const { getByText } = await render(<ConnectionPage />);
     expect(getByText(/No servers found/i)).toBeTruthy();
   });
 });

@@ -28,8 +28,8 @@ describe("ViewfinderGlass", () => {
     expect(canUseGlassEffect()).toBe(false);
   });
 
-  it("falls back to View and renders children", () => {
-    const { getByText, queryByTestId } = render(
+  it("falls back to View and renders children", async () => {
+    const { getByText, queryByTestId } = await render(
       <ViewfinderGlass fallbackStyle={{ backgroundColor: "red" }}>
         <Text>HUD</Text>
       </ViewfinderGlass>
@@ -39,8 +39,8 @@ describe("ViewfinderGlass", () => {
     expect(queryByTestId("glass-view")).toBeNull();
   });
 
-  it("falls back GlassContainer to View", () => {
-    const { getByText, queryByTestId } = render(
+  it("falls back GlassContainer to View", async () => {
+    const { getByText, queryByTestId } = await render(
       <ViewfinderGlassContainer>
         <Text>Nav</Text>
       </ViewfinderGlassContainer>

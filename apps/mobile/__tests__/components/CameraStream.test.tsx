@@ -97,58 +97,58 @@ describe('CameraStream', () => {
     jest.clearAllMocks();
   });
 
-  it('should render correctly with given URL', () => {
+  it('should render correctly with given URL', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     expect(getByTestId('camera-stream')).toBeTruthy();
     expect(getByTestId('webview')).toBeTruthy();
     expect(getByTestId('camera-stream-gestures')).toBeTruthy();
   });
 
-  it('should call onFrame when frame message is received', () => {
+  it('should call onFrame when frame message is received', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
 
     // Simulate receiving a "frame" message
-    fireEvent(webView, 'onMessage', {
+    await fireEvent(webView, 'onMessage', {
       nativeEvent: { data: 'frame' }
     });
 
     expect(mockOnFrame).toHaveBeenCalledTimes(1);
   });
 
-  it('should not call onFrame for non-frame messages', () => {
+  it('should not call onFrame for non-frame messages', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
 
     // Simulate receiving a non-frame message
-    fireEvent(webView, 'onMessage', {
+    await fireEvent(webView, 'onMessage', {
       nativeEvent: { data: 'other-message' }
     });
 
     expect(mockOnFrame).not.toHaveBeenCalled();
   });
 
-  it('should call onFrame multiple times for multiple frame messages', () => {
+  it('should call onFrame multiple times for multiple frame messages', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
 
     // Simulate receiving multiple frame messages
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
 
     expect(mockOnFrame).toHaveBeenCalledTimes(3);
   });
 
-  it('should handle different URL formats', () => {
+  it('should handle different URL formats', async () => {
     const urls = [
       'http://192.168.1.1:8080/live.mjpeg',
       'https://example.com/stream.mjpeg',
@@ -156,63 +156,63 @@ describe('CameraStream', () => {
       'http://10.0.0.1:8080/live.mjpeg',
     ];
 
-    urls.forEach((url) => {
-      const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    for (const url of urls) {
+      const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
       expect(getByTestId('webview')).toBeTruthy();
-    });
+    }
   });
 
-  it('should handle empty URL', () => {
-    const { getByTestId } = render(<CameraStream url="" onFrame={mockOnFrame} />);
+  it('should handle empty URL', async () => {
+    const { getByTestId } = await render(<CameraStream url="" onFrame={mockOnFrame} />);
     expect(getByTestId('webview')).toBeTruthy();
   });
 
-  it('should handle undefined onFrame callback', () => {
+  it('should handle undefined onFrame callback', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={undefined as any} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={undefined as any} />);
 
     const webView = getByTestId('webview');
 
     // Should not throw error when onFrame is undefined
-    expect(() => {
+    await expect(
       fireEvent(webView, 'onMessage', {
         nativeEvent: { data: 'frame' }
-      });
-    }).not.toThrow();
+      })
+    ).resolves.toBeUndefined();
   });
 
-  it('should handle mixed message types', () => {
+  it('should handle mixed message types', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
 
     // Mix of frame and non-frame messages
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'other' } });
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'another' } });
-    fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'other' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'another' } });
+    await fireEvent(webView, 'onMessage', { nativeEvent: { data: 'frame' } });
 
     expect(mockOnFrame).toHaveBeenCalledTimes(2);
   });
 
-  it('should handle special characters in URL', () => {
+  it('should handle special characters in URL', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg?param=value&other=test';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     expect(getByTestId('webview')).toBeTruthy();
   });
 
-  it('should handle very long URLs', () => {
+  it('should handle very long URLs', async () => {
     const longUrl = 'http://192.168.1.1:8080/live.mjpeg?' + 'a'.repeat(1000);
-    const { getByTestId } = render(<CameraStream url={longUrl} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={longUrl} onFrame={mockOnFrame} />);
 
     expect(getByTestId('webview')).toBeTruthy();
   });
 
-  it('should keep WebView HTML free of touch handlers', () => {
+  it('should keep WebView HTML free of touch handlers', async () => {
     const url = 'http://192.168.1.1:8080/live.mjpeg';
-    const { getByTestId } = render(<CameraStream url={url} onFrame={mockOnFrame} />);
+    const { getByTestId } = await render(<CameraStream url={url} onFrame={mockOnFrame} />);
 
     const webView = getByTestId('webview');
     const html = webView.props.source?.html ?? '';

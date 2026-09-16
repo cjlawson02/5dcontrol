@@ -2,10 +2,10 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { ConnectionHud } from "../../components/ConnectionHud";
 
 describe("ConnectionHud", () => {
-  it("opens reconnect and disconnect actions", () => {
+  it("opens reconnect and disconnect actions", async () => {
     const onReconnect = jest.fn();
     const onDisconnect = jest.fn();
-    const { getByTestId, queryByTestId } = render(
+    const { getByTestId, queryByTestId } = await render(
       <ConnectionHud
         cameraStatus="connected"
         serverStatus="connected"
@@ -15,16 +15,16 @@ describe("ConnectionHud", () => {
     );
 
     expect(queryByTestId("connection-hud-menu")).toBeNull();
-    fireEvent.press(getByTestId("connection-hud-toggle"));
+    await fireEvent.press(getByTestId("connection-hud-toggle"));
     expect(getByTestId("connection-hud-menu")).toBeTruthy();
 
-    fireEvent.press(getByTestId("connection-hud-reconnect"));
+    await fireEvent.press(getByTestId("connection-hud-reconnect"));
     expect(onReconnect).toHaveBeenCalled();
   });
 
-  it("disconnects from the menu", () => {
+  it("disconnects from the menu", async () => {
     const onDisconnect = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ConnectionHud
         cameraStatus="connected"
         serverStatus="connected"
@@ -33,8 +33,8 @@ describe("ConnectionHud", () => {
       />
     );
 
-    fireEvent.press(getByTestId("connection-hud-toggle"));
-    fireEvent.press(getByTestId("connection-hud-disconnect"));
+    await fireEvent.press(getByTestId("connection-hud-toggle"));
+    await fireEvent.press(getByTestId("connection-hud-disconnect"));
     expect(onDisconnect).toHaveBeenCalled();
   });
 });
